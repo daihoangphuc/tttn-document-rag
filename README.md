@@ -3,6 +3,124 @@
 ## Giới thiệu
 Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng cho phép người dùng tải lên tài liệu và đặt câu hỏi dựa trên nội dung của các tài liệu đó. Hệ thống sử dụng mô hình ngôn ngữ Gemini của Google để tạo ra câu trả lời chính xác và phù hợp với ngữ cảnh.
 
+## Quy trình hoạt động
+
+### 1. Tổng quan hệ thống
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│                 │     │                 │     │                 │
+│  Người dùng     │────▶│  Web Interface  │────▶│  Flask Server   │
+│                 │     │                 │     │                 │
+└─────────────────┘     └─────────────────┘     └─────────┬───────┘
+                                                          │
+                                                          ▼
+ ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+ │                 │     │                 │     │                 │
+ │  Gemini API     │◀───▶│  RAG Engine     │◀───▶│  Vector Store   │
+ │                 │     │                 │     │                 │
+ └─────────────────┘     └─────────────────┘     └─────────────────┘
+```
+
+### 2. Quy trình xử lý tài liệu
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│             │     │             │     │             │     │             │
+│ Upload File │────▶│ Extract Text│────▶│ Chunking    │────▶│ Embedding   │
+│             │     │             │     │             │     │             │
+└─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
+                                                                   │
+                                                                   ▼
+                                                            ┌─────────────┐
+                                                            │             │
+                                                            │ Vector Store│
+                                                            │             │
+                                                            └─────────────┘
+```
+
+### 3. Quy trình trả lời câu hỏi
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│             │     │             │     │             │     │             │
+│ Câu hỏi     │────▶│ Query       │────▶│ Retrieval   │────▶│ Reranking   │
+│             │     │ Transform   │     │             │     │             │
+└─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
+                                                                   │
+                                                                   ▼
+ ┌─────────────┐                                            ┌─────────────┐
+ │             │                                            │             │
+ │ Trả lời     │◀───────────────────────────────────────────│ Gemini LLM  │
+ │             │                                            │             │
+ └─────────────┘                                            └─────────────┘
+```
+
+### 4. Chi tiết các thành phần chính
+
+#### 4.1. Xử lý tài liệu
+
+1. **Upload File**:
+   - Hỗ trợ các định dạng: PDF, DOCX, TXT
+   - API Endpoint: `/upload`
+
+2. **Extract Text**:
+   - Trích xuất văn bản từ file
+   - Các hàm: `extract_text_pdf()`, `extract_text_docx()`, `extract_text_txt()`
+
+3. **Chunking**:
+   - Chia văn bản thành các đoạn nhỏ
+   - Các phương pháp: Sentence Windows, Paragraph, Semantic, Token, Adaptive, Hierarchical, Contextual, Multi-granularity, Hybrid
+
+4. **Embedding**:
+   - Chuyển đổi các đoạn văn bản thành vector
+   - Sử dụng mô hình: SentenceTransformer
+
+5. **Vector Store**:
+   - Lưu trữ và đánh chỉ mục các vector
+   - Sử dụng FAISS để tìm kiếm hiệu quả
+
+#### 4.2. Trả lời câu hỏi
+
+1. **Query Transform**:
+   - Tối ưu hóa câu hỏi cho tiếng Việt
+   - Hàm: `transform_query_for_vietnamese()`
+
+2. **Retrieval**:
+   - Tìm kiếm các đoạn văn bản liên quan nhất
+   - Sử dụng tìm kiếm vector similarity
+
+3. **Reranking**:
+   - Sắp xếp lại kết quả để tăng độ chính xác
+   - Hàm: `rerank_results_for_vietnamese()`
+
+4. **Context Building**:
+   - Xây dựng ngữ cảnh tối ưu từ các đoạn văn bản
+   - Hàm: `build_optimized_context()`
+
+5. **Gemini LLM**:
+   - Tạo câu trả lời dựa trên ngữ cảnh và câu hỏi
+   - Hàm: `generate_with_retry()`
+   - Hỗ trợ chuyển đổi API key khi cần
+
+#### 5. Các tính năng đặc biệt
+
+1. **Tối ưu hóa cho tiếng Việt**:
+   - Xử lý đặc thù cho ngôn ngữ tiếng Việt
+   - Sử dụng thư viện underthesea, pyvi
+
+2. **Quản lý API Key**:
+   - Hỗ trợ nhiều API key
+   - Tự động chuyển đổi khi gặp lỗi quota
+
+3. **Đánh giá hiệu suất**:
+   - Theo dõi thời gian truy xuất và trả lời
+   - API Endpoint: `/api/performance`
+
+4. **Tùy chỉnh chunking**:
+   - Cho phép người dùng chọn phương pháp chunking
+   - Tùy chỉnh tham số qua API: `/settings`
+
 ## Cấu trúc dự án
 ```
 BE/
