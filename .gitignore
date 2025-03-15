@@ -1,0 +1,35 @@
+# Biến môi trường
+.env
+
+# Thư mục uploads
+uploads/*
+!uploads/.gitkeep
+
+# Các file cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Môi trường ảo
+venv/
+env/
+ENV/
+
+# Các file dữ liệu
+*.pkl
+*.npy
+*.faiss
+*.index
+
+# Logs
+*.log
+
+# Các file hệ thống
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo 

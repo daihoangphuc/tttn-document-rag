@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <title>RAG System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Tailwind CSS và Flowbite -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {"50":"#eff6ff","100":"#dbeafe","200":"#bfdbfe","300":"#93c5fd","400":"#60a5fa","500":"#3b82f6","600":"#2563eb","700":"#1d4ed8","800":"#1e40af","900":"#1e3a8a","950":"#172554"}
+                    }
+                },
+                fontFamily: {
+                    'body': [
+                        'Inter', 
+                        'ui-sans-serif', 
+                        'system-ui', 
+                        'sans-serif'
+                    ],
+                    'sans': [
+                        'Inter', 
+                        'ui-sans-serif', 
+                        'system-ui', 
+                        'sans-serif'
+                    ]
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Tailwind CSS */
+        /*! tailwindcss v2.2.19 | MIT License | https://tailwindcss.com */
+        /*! modern-normalize v1.1.0 | MIT License | https://github.com/sindresorhus/modern-normalize */
+        
+        /* Custom styles */
+        .chat-message {
+            margin-bottom: 1rem;
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            word-break: break-word;
+        }
+        
+        .user-message {
+            margin-left: auto;
+            background-color: #e9f5ff;
+            color: #333;
+            border-top-right-radius: 0;
+            text-align: right;
+        }
+        
+        .bot-message {
+            margin-right: auto;
+            background-color: #f1f1f1;
+            color: #333;
+            border-top-left-radius: 0;
+        }
+        
+        #typing-indicator {
+            margin-right: auto;
+            background-color: #f1f1f1;
+            color: #333;
+            border-top-left-radius: 0;
+            margin-bottom: 1rem;
+            max-width: 85%;
+            padding: 0.75rem 1rem;
+        }
+        
+        /* CSS cho drag and drop */
+        .dropzone {
+            border: 2px dashed #ccc;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        @media (max-width: 640px) {
+            .dropzone {
+                padding: 1rem;
+            }
+        }
+        
+        .dropzone.active {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        
+        /* CSS cho hiệu ứng typing indicator */
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: typing 1.4s infinite both;
+        }
+        
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes typing {
+            0%, 100% {
+                transform: translateY(0);
+                opacity: 0.5;
+            }
+            50% {
+                transform: translateY(-4px);
+                opacity: 1;
+            }
+        }
+        
+        /* CSS cho modal xác nhận xóa tài liệu */
+        #deleteFileModal {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 50;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        #deleteFileModal.hidden {
+            display: none;
+        }
+        
+        #deleteFileModal .relative {
+            margin: auto;
+            width: 100%;
+            max-width: 28rem;
+        }
+        
+        /* CSS cho thông báo upload_result */
+        .upload-result-message {
+            animation: slideIn 0.3s ease-out;
+            transition: opacity 0.5s ease-in-out;
+            position: relative;
+            cursor: pointer;
+        }
+        
+        .upload-result-message::after {
+            content: "×";
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 1rem;
+            font-weight: bold;
+            color: inherit;
+            opacity: 0.7;
+        }
+        
+        .upload-result-message:hover::after {
+            opacity: 1;
+        }
+        
+        .upload-result-message.fade-out {
+            opacity: 0;
+        }
+        
+        /* Tối ưu cho thiết bị di động */
+        @media (max-width: 640px) {
+            .chat-message {
+                max-width: 90%;
+                padding: 0.5rem 0.75rem;
+                margin-bottom: 0.75rem;
+            }
+            
+            #typing-indicator {
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                border: 1px solid rgba(0, 0, 0, 0.1);
+                padding: 0.5rem 0.75rem;
+                max-width: 80%;
+            }
+            
+            .typing-dot {
+                width: 8px;
+                height: 8px;
+            }
+            
+            #question {
+                padding: 0.75rem;
+                font-size: 0.875rem;
+            }
+            
+            #chat-container {
+                padding-bottom: 5rem;
+            }
+            
+            /* Tối ưu sidebar cho mobile */
+            #sidebar {
+                width: 85%;
+                max-width: 300px;
+                box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+                z-index: 100;
+            }
+            
+            /* Tối ưu form upload cho mobile */
+            .dropzone {
+                min-height: 100px;
+            }
+            
+            /* Tối ưu khoảng cách các phần tử trong form */
+            .space-y-3 {
+                margin-bottom: 0.5rem;
+            }
+            
+            /* Tối ưu kích thước nút */
+            button[type="submit"] {
+                padding-top: 0.5rem;
+                padding-bottom: 0.5rem;
+            }
+            
+            /* Tối ưu kích thước nút toggle sidebar */
+            #toggleSidebar {
+                width: 40px;
+                height: 40px;
+                top: 8px;
+                left: 8px;
+                background-color: rgba(255, 255, 255, 0.9);
+                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+                border-radius: 8px;
+            }
+            
+            /* Tối ưu kích thước các phần tử trong sidebar */
+            #sidebar h2 {
+                font-size: 1.25rem;
+            }
+            
+            /* Tối ưu kích thước modal */
+            #deleteFileModal .relative {
+                max-width: 90%;
+                margin: 0 auto;
+            }
+            
+            /* Tăng kích thước vùng nhấn cho các nút */
+            button, select, input[type="submit"] {
+                min-height: 40px;
+            }
+            
+            /* Tối ưu khoảng cách giữa các phần tử */
+            .p-2 {
+                padding: 0.375rem;
+            }
+            
+            .p-4 {
+                padding: 0.75rem;
+            }
+            
+            /* Cải thiện khả năng đọc trên màn hình nhỏ */
+            .text-xs {
+                font-size: 0.8125rem;
+            }
+            
+            /* Tối ưu hiển thị của các nút xóa tài liệu */
+            .delete-file-btn {
+                padding: 8px;
+                margin-left: 8px;
+            }
+            
+            /* Tối ưu hiển thị của thông báo upload_result */
+            .upload-result-message {
+                padding: 0.75rem 1.5rem 0.75rem 0.75rem;
+            }
+            
+            /* Tối ưu hiển thị của form câu hỏi */
+            #question-form {
+                padding-top: 0.75rem;
+                padding-bottom: 0.75rem;
+            }
+            
+            /* Tối ưu hiển thị của chat container */
+            #chat-container {
+                padding: 0.5rem;
+            }
+        }
+        
+        /* Thêm animation cho các thông báo */
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900">
+    <!-- Nút toggle sidebar -->
+    <button id="toggleSidebar" type="button" class="fixed top-4 left-4 z-50 inline-flex items-center p-2 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600 lg:hidden">
+        <span class="sr-only">Mở sidebar</span>
+        <svg class="w-6 h-6" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path clip-rule="evenodd" fill-rule="evenodd" d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z"></path>
+        </svg>
+    </button>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
+        <div class="h-full px-2 sm:px-3 py-3 sm:py-4 overflow-y-auto bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-3 sm:mb-4">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">RAG System</h2>
+                <button id="closeSidebar" type="button" class="lg:hidden text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 inline-flex items-center dark:hover:bg-gray-600 dark:hover:text-white">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                </button>
+        </div>
+        
+            <!-- Nội dung sidebar -->
+            <div class="space-y-4 sm:space-y-6">
+                <!-- Phần tài liệu đã tải lên -->
+                <div>
+                    <h3 class="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-500 uppercase dark:text-gray-400">Tài liệu đã tải lên</h3>
+                    <div class="space-y-1 sm:space-y-2">
+            {% if files %}
+                {% for filename, info in files.items() %}
+                                <div class="flex items-center justify-between p-1.5 sm:p-2 text-sm font-normal text-gray-900 rounded-lg hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">
+                                    <div class="truncate">
+                                        <span class="flex-1 text-xs sm:text-sm">{{ filename }}</span>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ info.chunk_count }} chunks, {{ info.chunking_method }}</p>
+                                    </div>
+                                    <button type="button" class="delete-file-btn text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400" data-filename="{{ filename }}">
+                                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                                    </button>
+                                </div>
+                {% endfor %}
+            {% else %}
+                            <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Chưa có tài liệu nào.</p>
+            {% endif %}
+                    </div>
+        </div>
+        
+                <!-- Phần upload tài liệu -->
+                <div>
+                    <h3 class="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-500 uppercase dark:text-gray-400">Tải lên tài liệu mới</h3>
+                    <form action="/upload" method="post" enctype="multipart/form-data" class="space-y-3 sm:space-y-4">
+                        <div id="dropzone" class="dropzone">
+                            <label for="file-upload" class="cursor-pointer">
+                                <svg class="w-6 h-6 sm:w-8 sm:h-8 mb-1 sm:mb-2 text-gray-500 dark:text-gray-400 mx-auto" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                                </svg>
+                                <p class="mb-1 sm:mb-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400">Kéo thả file vào đây hoặc <span class="text-blue-600 dark:text-blue-500 font-medium">chọn file</span></p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">PDF, DOCX, TXT (có thể chọn nhiều file)</p>
+                                <input id="file-upload" type="file" name="file[]" class="hidden" multiple required>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label for="chunking_method" class="block mb-1 sm:mb-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Phương pháp chunking:</label>
+                            <select name="chunking_method" id="chunking_method" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5 sm:p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    <option value="sentence_windows">Cửa sổ câu</option>
+                    <option value="paragraph">Đoạn văn</option>
+                    <option value="semantic">Ngữ nghĩa</option>
+                    <option value="token">Token</option>
+                    <option value="hybrid">Hybrid</option>
+                    <option value="adaptive">Thích ứng</option>
+                    <option value="hierarchical">Phân cấp</option>
+                    <option value="contextual">Ngữ cảnh</option>
+                </select>
+                        </div>
+                
+                        <button type="submit" class="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-xs sm:text-sm px-3 sm:px-5 py-2 sm:py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Tải lên</button>
+            </form>
+            
+            {% if upload_result %}
+                    <div id="uploadResultMessage" class="upload-result-message mt-3 sm:mt-4 p-2 sm:p-4 text-xs sm:text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-800 dark:text-blue-400" role="alert">
+                        {{ upload_result }}
+                    </div>
+            {% endif %}
+        </div>
+        
+                <!-- Nút mở cài đặt -->
+                <!-- <div>
+                    <button id="settingsButton" class="w-full flex items-center p-1.5 sm:p-2 text-sm font-normal text-gray-900 rounded-lg hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z"></path></svg>
+                        <span class="ml-3 text-xs sm:text-sm">Cài đặt</span>
+                    </button>
+                </div> -->
+            </div>
+        </div>
+    </aside>
+
+    <!-- Modal cài đặt -->
+    <div id="settingsModal" tabindex="-1" aria-hidden="true" class="fixed top-0 left-0 right-0 z-50 hidden w-full p-2 sm:p-4 overflow-x-hidden overflow-y-auto md:inset-0 h-[calc(100%-1rem)] max-h-full">
+        <div class="relative w-full max-w-2xl max-h-full">
+            <!-- Modal content -->
+            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+                <!-- Modal header -->
+                <div class="flex items-center justify-between p-3 sm:p-4 md:p-5 border-b rounded-t dark:border-gray-600">
+                    <h3 class="text-lg sm:text-xl font-medium text-gray-900 dark:text-white">Cài đặt</h3>
+                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-hide="settingsModal">
+                        <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                        </svg>
+                        <span class="sr-only">Đóng</span>
+                    </button>
+                </div>
+                <!-- Modal body -->
+                <div class="p-3 sm:p-4 md:p-5 space-y-4">
+                    <form action="/settings" method="post" class="space-y-4 sm:space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                            <div class="space-y-3 sm:space-y-4">
+                                <h4 class="text-base sm:text-lg font-medium text-gray-900 dark:text-white">Cửa sổ câu</h4>
+                                <div>
+                                    <label for="window_size" class="block mb-1 sm:mb-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Kích thước cửa sổ:</label>
+                                    <input type="number" name="window_size" id="window_size" value="{{ settings.sentence_windows.window_size }}" min="1" max="10" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 sm:p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label for="step" class="block mb-1 sm:mb-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Bước:</label>
+                                    <input type="number" name="step" id="step" value="{{ settings.sentence_windows.step }}" min="1" max="5" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2 sm:p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white">Đoạn văn</h4>
+                                <div>
+                                    <label for="max_chars" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Số ký tự tối đa:</label>
+                                    <input type="number" name="max_chars" id="max_chars" value="{{ settings.paragraph.max_chars }}" min="100" max="5000" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label for="overlap" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Overlap:</label>
+                                    <input type="number" name="overlap" id="overlap" value="{{ settings.paragraph.overlap }}" min="0" max="1000" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white">Ngữ nghĩa</h4>
+                                <div>
+                                    <label for="min_words" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Số từ tối thiểu:</label>
+                                    <input type="number" name="min_words" id="min_words" value="{{ settings.semantic.min_words }}" min="10" max="100" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label for="max_words" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Số từ tối đa:</label>
+                                    <input type="number" name="max_words" id="max_words" value="{{ settings.semantic.max_words }}" min="50" max="500" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-4">
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white">Token</h4>
+                                <div>
+                                    <label for="max_tokens" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Số token tối đa:</label>
+                                    <input type="number" name="max_tokens" id="max_tokens" value="{{ settings.token.max_tokens }}" min="100" max="1000" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label for="overlap_tokens" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Overlap token:</label>
+                                    <input type="number" name="overlap_tokens" id="overlap_tokens" value="{{ settings.token.overlap_tokens }}" min="0" max="200" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Lưu cài đặt</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal xác nhận xóa tài liệu -->
+    <div id="deleteFileModal" tabindex="-1" aria-hidden="true" class="hidden">
+        <div class="relative w-full max-w-md">
+            <!-- Modal content -->
+            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+                <!-- Modal header -->
+                <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t dark:border-gray-600">
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">Xác nhận xóa tài liệu</h3>
+                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-hide="deleteFileModal">
+                        <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                        </svg>
+                        <span class="sr-only">Đóng</span>
+                    </button>
+                </div>
+                <!-- Modal body -->
+                <div class="p-4 md:p-5">
+                    <p class="text-base leading-relaxed text-gray-500 dark:text-gray-400">
+                        Bạn có chắc chắn muốn xóa tài liệu "<span id="fileToDelete" class="font-medium"></span>" không?
+                    </p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        Hành động này không thể hoàn tác và tất cả dữ liệu liên quan đến tài liệu này sẽ bị xóa khỏi hệ thống.
+                    </p>
+                    <div class="flex items-center justify-end mt-4 space-x-2">
+                        <button type="button" class="py-2 px-3 text-sm font-medium text-gray-500 bg-white rounded-lg border border-gray-200 hover:bg-gray-100 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600" data-modal-hide="deleteFileModal">
+                            Hủy
+                        </button>
+                        <form id="deleteFileForm" action="/remove" method="post">
+                            <input type="hidden" id="deleteFilename" name="filename" value="">
+                            <button type="submit" class="py-2 px-3 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:ring-4 focus:outline-none focus:ring-red-300 dark:bg-red-500 dark:hover:bg-red-600 dark:focus:ring-red-900">
+                                Xóa tài liệu
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Khu vực chính (Main content) -->
+    <div class="p-2 sm:p-4 lg:ml-64 min-h-screen flex flex-col">
+        <div class="p-2 sm:p-4 bg-white rounded-lg dark:bg-gray-800 mb-4">
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4">RAG System</h1>
+            
+            <!-- Khu vực chat -->
+            <div class="flex flex-col h-[70vh] sm:h-[75vh]">
+                <!-- Tùy chọn mô hình, top k, ngưỡng -->
+                <!-- <div class="flex flex-wrap gap-2 sm:gap-4 mb-2 sm:mb-4 p-2 sm:p-3 bg-gray-50 rounded-t-lg dark:bg-gray-700">
+                    <div class="flex items-center">
+                        <label for="model" class="block mr-1 sm:mr-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Mô hình:</label>
+                        <select name="model" id="model" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1 sm:p-2 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                            <option value="gemini-1.5-pro" selected>Gemini 1.5 Pro</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <label for="top_k" class="block mr-1 sm:mr-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Top K:</label>
+                        <input type="number" name="top_k" id="top_k" value="10" min="1" max="50" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-14 sm:w-20 p-1 sm:p-2 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <label for="threshold" class="block mr-1 sm:mr-2 text-xs sm:text-sm font-medium text-gray-900 dark:text-white">Ngưỡng:</label>
+                        <input type="number" name="threshold" id="threshold" value="5.0" min="0" max="20" step="0.1" class="bg-gray-50 border border-gray-300 text-gray-900 text-xs sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-14 sm:w-20 p-1 sm:p-2 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
+                    </div>
+                </div> -->
+                
+                <!-- Khu vực hiển thị tin nhắn -->
+                <div id="chat-container" class="flex-1 flex flex-col space-y-4 overflow-y-auto p-2 sm:p-4 bg-gray-50 dark:bg-gray-700 pb-24 sm:pb-28 h-[calc(100vh-180px)] sm:h-[calc(100vh-200px)]">
+                    <!-- Tin nhắn chào mừng -->
+                    <div class="chat-message bot-message">
+                        <p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">Xin chào! Tôi là trợ lý AI. Bạn có thể đặt câu hỏi về các tài liệu đã tải lên.</p>
+                    </div>
+                    
+                    {% if answer %}
+                    <!-- Tin nhắn người dùng -->
+                    <div class="chat-message user-message">
+                        <p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">{{ request.form.get('question', '') }}</p>
+                    </div>
+                    
+                    <!-- Tin nhắn bot -->
+                    <div class="chat-message bot-message">
+                        <div class="text-gray-800 dark:text-gray-200 whitespace-pre-wrap text-sm sm:text-base">{{ answer }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Form đặt câu hỏi - Thay đổi để luôn bám dưới -->
+                <form id="question-form" action="/query" method="post" class="fixed bottom-0 left-0 right-0 lg:left-64 p-2 sm:p-3 bg-gray-50 rounded-b-lg dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 z-10">
+                    <!-- Hiệu ứng đang soạn tin - Di chuyển vào đây để nó nằm ở dưới cùng, gần ô nhập liệu -->
+                    <div id="typing-indicator" class="ml-10 hidden fixed bottom-[60px] sm:bottom-[70px] left-2 sm:left-4 lg:left-[calc(16rem+0.5rem)] bg-gray-100 dark:bg-gray-600 rounded-lg p-2 shadow-md z-20">
+                        <div class="flex items-center">
+                            <span class="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mr-2">Đang truy xuất thông tin</span>
+                            <div class="flex space-x-1">
+                                <div class="typing-dot bg-gray-500 dark:bg-gray-400"></div>
+                                <div class="typing-dot bg-gray-500 dark:bg-gray-400"></div>
+                                <div class="typing-dot bg-gray-500 dark:bg-gray-400"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="relative max-w-[calc(100%-2rem)] mx-auto lg:max-w-none">
+                        <input type="hidden" name="model" id="form-model" value="gemini-2.0-flash-lite">
+                        <input type="hidden" name="top_k" id="form-top_k" value="15">
+                        <input type="hidden" name="threshold" id="form-threshold" value="0.5">
+                        <input type="text" name="question" id="question" class="block w-full p-3 sm:p-4 pr-10 sm:pr-12 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Nhập câu hỏi của bạn..." value="{{ request.form.get('question', '') }}">
+                        <button type="submit" class="absolute inset-y-0 right-0 flex items-center px-3 sm:px-4 text-white bg-blue-700 rounded-r-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+                            <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/>
+                            </svg>
+                            <span class="sr-only">Gửi</span>
+                        </button>
+                    </div>
+                </form>
+        </div>
+    </div>
+    </div>
+        </div>
+        
+    <!-- Flowbite JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
+    
+    <!-- JavaScript cho các tính năng tương tác -->
+    <script>
+        // Xử lý toggle sidebar
+        document.getElementById('toggleSidebar').addEventListener('click', function() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('-translate-x-full');
+        });
+        
+        document.getElementById('closeSidebar').addEventListener('click', function() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.add('-translate-x-full');
+        });
+        
+        // Đóng sidebar khi nhấp vào khu vực chính trên thiết bị di động
+        if (window.innerWidth < 1024) {
+            document.querySelector('.lg\\:ml-64').addEventListener('click', function(e) {
+                if (e.target.closest('#sidebar') === null && !document.getElementById('sidebar').classList.contains('-translate-x-full')) {
+                    document.getElementById('sidebar').classList.add('-translate-x-full');
+                }
+            });
+        }
+        
+        // Xử lý kích thước màn hình thay đổi
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 1024) {
+                document.getElementById('sidebar').classList.remove('-translate-x-full');
+            } else {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+            }
+            
+            // Điều chỉnh vị trí của typing indicator khi thay đổi kích thước màn hình
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (!typingIndicator.classList.contains('hidden')) {
+                if (window.innerWidth < 640) {
+                    typingIndicator.style.opacity = '1';
+                    typingIndicator.style.bottom = '60px';
+                } else {
+                    typingIndicator.style.opacity = '';
+                    typingIndicator.style.bottom = '';
+                }
+            }
+            
+            // Điều chỉnh chiều cao của chat container
+            adjustChatContainerHeight();
+        });
+        
+        // Hàm điều chỉnh chiều cao của chat container
+        function adjustChatContainerHeight() {
+            const chatContainer = document.getElementById('chat-container');
+            const windowHeight = window.innerHeight;
+            const formHeight = document.getElementById('question-form').offsetHeight;
+            const headerHeight = 60; // Ước tính chiều cao của header
+            
+            // Điều chỉnh chiều cao của chat container
+            chatContainer.style.height = `${windowHeight - formHeight - headerHeight}px`;
+        }
+        
+        // Điều chỉnh chiều cao ban đầu
+        window.addEventListener('load', adjustChatContainerHeight);
+        
+        // Xử lý modal cài đặt
+        const settingsButton = document.getElementById('settingsButton');
+        if (settingsButton) {
+            settingsButton.addEventListener('click', function() {
+                const modal = document.getElementById('settingsModal');
+                modal.classList.remove('hidden');
+                modal.setAttribute('aria-hidden', 'false');
+            });
+        }
+        
+        // Đóng modal khi nhấn nút đóng
+        document.querySelectorAll('[data-modal-hide="settingsModal"]').forEach(button => {
+            button.addEventListener('click', function() {
+                const modal = document.getElementById('settingsModal');
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            });
+        });
+        
+        // Xử lý drag and drop cho upload file
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-upload');
+        
+        if (dropzone && fileInput) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dropzone.classList.add('active');
+            }
+            
+            function unhighlight() {
+                dropzone.classList.remove('active');
+            }
+            
+            dropzone.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                fileInput.files = files;
+                
+                // Hiển thị tên file khi kéo thả
+                if (files.length > 0) {
+                    displayFileNames(files);
+                }
+            }
+            
+            // Hiển thị tên file khi chọn
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files.length > 0) {
+                    displayFileNames(fileInput.files);
+                }
+            });
+            
+            function displayFileNames(files) {
+                // Xóa thông báo file cũ nếu có
+                const oldFileNameDisplay = dropzone.querySelector('.file-list');
+                if (oldFileNameDisplay) {
+                    oldFileNameDisplay.remove();
+                }
+                
+                const fileListContainer = document.createElement('div');
+                fileListContainer.className = 'file-list mt-2 text-sm text-gray-600 dark:text-gray-400';
+                
+                if (files.length === 1) {
+                    const fileNameDisplay = document.createElement('p');
+                    fileNameDisplay.textContent = `File đã chọn: ${files[0].name}`;
+                    fileListContainer.appendChild(fileNameDisplay);
+                } else {
+                    const fileCountDisplay = document.createElement('p');
+                    fileCountDisplay.textContent = `Đã chọn ${files.length} file:`;
+                    fileListContainer.appendChild(fileCountDisplay);
+                    
+                    const fileList = document.createElement('ul');
+                    fileList.className = 'list-disc pl-5 mt-1';
+                    
+                    for (let i = 0; i < files.length; i++) {
+                        const fileItem = document.createElement('li');
+                        fileItem.textContent = files[i].name;
+                        fileList.appendChild(fileItem);
+                    }
+                    
+                    fileListContainer.appendChild(fileList);
+                }
+                
+                dropzone.appendChild(fileListContainer);
+            }
+        }
+        
+        // Cuộn xuống cuối khu vực chat khi tải trang
+        window.onload = function() {
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+            
+            // Đồng bộ giá trị từ các trường tùy chọn vào form
+            syncFormValues();
+            
+            // Xử lý xác nhận xóa tài liệu
+            const deleteButtons = document.querySelectorAll('.delete-file-btn');
+            const deleteFileModal = document.getElementById('deleteFileModal');
+            const fileToDeleteSpan = document.getElementById('fileToDelete');
+            const deleteFilenameInput = document.getElementById('deleteFilename');
+            
+            // Thêm sự kiện click cho mỗi nút
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Lấy tên file từ thuộc tính data-filename
+                    const filename = this.getAttribute('data-filename');
+                    
+                    // Cập nhật modal với tên file
+                    fileToDeleteSpan.textContent = filename;
+                    deleteFilenameInput.value = filename;
+                    
+                    // Hiển thị modal xác nhận
+                    deleteFileModal.classList.remove('hidden');
+                    
+                    // Đảm bảo modal nằm giữa màn hình
+                    centerModal(deleteFileModal);
+                });
+            });
+            
+            // Xử lý đóng modal
+            document.querySelectorAll('[data-modal-hide="deleteFileModal"]').forEach(button => {
+                button.addEventListener('click', function() {
+                    deleteFileModal.classList.add('hidden');
+                });
+            });
+            
+            // Đóng modal khi click bên ngoài
+            deleteFileModal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                }
+            });
+            
+            // Xử lý form xóa tài liệu
+            const deleteFileForm = document.getElementById('deleteFileForm');
+            if (deleteFileForm) {
+                deleteFileForm.addEventListener('submit', function(e) {
+                    // Hiển thị trạng thái đang xử lý
+                    const submitButton = this.querySelector('button[type="submit"]');
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = `
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Đang xóa...
+                    `;
+                });
+            }
+            
+            // Hàm để căn giữa modal
+            function centerModal(modal) {
+                if (!modal) return;
+                
+                // Không cần tính toán vị trí nữa vì đã sử dụng CSS để căn giữa
+                // Chỉ cần đảm bảo modal hiển thị
+                modal.classList.remove('hidden');
+            }
+            
+            // Đồng bộ giá trị từ các trường tùy chọn vào form
+            function syncFormValues() {
+                const modelSelect = document.getElementById('model');
+                const topKInput = document.getElementById('top_k');
+                const thresholdInput = document.getElementById('threshold');
+                
+                const formModel = document.getElementById('form-model');
+                const formTopK = document.getElementById('form-top_k');
+                const formThreshold = document.getElementById('form-threshold');
+                
+                if (modelSelect && formModel) {
+                    // Đồng bộ giá trị ban đầu
+                    formModel.value = modelSelect.value;
+                    
+                    // Lắng nghe sự thay đổi
+                    modelSelect.addEventListener('change', function() {
+                        formModel.value = this.value;
+                    });
+                }
+                
+                if (topKInput && formTopK) {
+                    formTopK.value = topKInput.value;
+                    
+                    topKInput.addEventListener('change', function() {
+                        formTopK.value = this.value;
+                    });
+                }
+                
+                if (thresholdInput && formThreshold) {
+                    formThreshold.value = thresholdInput.value;
+                    
+                    thresholdInput.addEventListener('change', function() {
+                        formThreshold.value = this.value;
+                    });
+                }
+            }
+            
+            // Hiển thị hiệu ứng đang soạn tin khi gửi form
+            document.getElementById('question-form').addEventListener('submit', function(e) {
+                // Ngăn form submit mặc định
+                e.preventDefault();
+                
+                // Lấy giá trị câu hỏi
+                const questionInput = document.getElementById('question');
+                const question = questionInput.value.trim();
+                
+                if (!question) {
+                    console.log('Empty question, not submitting');
+                    return; // Không làm gì nếu không có câu hỏi
+                }
+                
+                console.log('Processing question:', question);
+                
+                // Lấy và disable nút gửi
+                const submitButton = this.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+                
+                // Thêm tin nhắn người dùng vào chat
+                const chatContainer = document.getElementById('chat-container');
+                const userMessage = document.createElement('div');
+                userMessage.className = 'chat-message user-message';
+                userMessage.innerHTML = `<p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">${question}</p>`;
+                chatContainer.appendChild(userMessage);
+                
+                // Hiển thị typing indicator
+                const typingIndicator = document.getElementById('typing-indicator');
+                typingIndicator.classList.remove('hidden');
+                
+                // Điều chỉnh vị trí của typing indicator dựa trên kích thước màn hình
+                if (window.innerWidth < 640) {
+                    // Trên thiết bị di động, đảm bảo indicator hiển thị rõ ràng
+                    typingIndicator.style.opacity = '1';
+                    // Đảm bảo indicator hiển thị đúng vị trí trên thiết bị di động
+                    typingIndicator.style.bottom = '60px';
+                }
+                
+                // Cuộn xuống để hiển thị tin nhắn mới
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                
+                // Tạo FormData trước khi xóa giá trị input
+                const formData = new FormData();
+                
+                // Thêm các trường dữ liệu vào FormData
+                formData.append('question', question);
+                formData.append('model', document.getElementById('form-model').value);
+                formData.append('top_k', document.getElementById('form-top_k').value);
+                formData.append('threshold', document.getElementById('form-threshold').value);
+                
+                // Debug log
+                console.log('Submitting question:', question);
+                console.log('Model:', document.getElementById('form-model').value);
+                console.log('Top K:', document.getElementById('form-top_k').value);
+                console.log('Threshold:', document.getElementById('form-threshold').value);
+                
+                // Xóa giá trị trong ô input sau khi gửi
+                questionInput.value = '';
+                
+                // Gửi form sau khi đã hiển thị tin nhắn người dùng
+                fetch('/query', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    return response.text();
+                })
+                .then(html => {
+                    console.log('Response HTML length:', html.length);
+                    
+                    // Ẩn typing indicator
+                    typingIndicator.classList.add('hidden');
+                    typingIndicator.style.opacity = '';
+                    typingIndicator.style.bottom = '';
+                    
+                    // Tạo một div tạm thời để phân tích HTML
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = html;
+                    
+                    // Lấy tin nhắn bot từ HTML trả về
+                    const botMessages = tempDiv.querySelectorAll('.bot-message');
+                    console.log('Bot messages found:', botMessages.length);
+                    
+                    if (botMessages.length > 0) {
+                        const lastBotMessage = botMessages[botMessages.length - 1];
+                        console.log('Last bot message content:', lastBotMessage.innerHTML);
+                        
+                        // Tạo phần tử tin nhắn bot mới
+                        const botMessageDiv = document.createElement('div');
+                        botMessageDiv.className = 'chat-message bot-message';
+                        botMessageDiv.innerHTML = lastBotMessage.innerHTML;
+                        
+                        // Thêm vào container
+                        chatContainer.appendChild(botMessageDiv);
+                        
+                        // Cuộn xuống để hiển thị tin nhắn mới
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    } else {
+                        // Nếu không tìm thấy tin nhắn bot, hiển thị toàn bộ phản hồi
+                        console.log('No bot message found, displaying raw response');
+                        const botMessageDiv = document.createElement('div');
+                        botMessageDiv.className = 'chat-message bot-message';
+                        botMessageDiv.innerHTML = `<p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">${html}</p>`;
+                        chatContainer.appendChild(botMessageDiv);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    }
+                    
+                    // Enable lại nút gửi sau khi nhận được câu trả lời
+                    submitButton.disabled = false;
+                    submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // Ẩn typing indicator nếu có lỗi
+                    typingIndicator.classList.add('hidden');
+                    typingIndicator.style.opacity = '';
+                    typingIndicator.style.bottom = '';
+                    
+                    // Hiển thị thông báo lỗi
+                    const errorMessage = document.createElement('div');
+                    errorMessage.className = 'chat-message bot-message';
+                    errorMessage.innerHTML = `<p class="text-red-500 dark:text-red-400 text-sm sm:text-base">Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.</p>`;
+                    chatContainer.appendChild(errorMessage);
+                    
+                    // Cuộn xuống để hiển thị tin nhắn lỗi
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    
+                    // Enable lại nút gửi nếu có lỗi
+                    submitButton.disabled = false;
+                    submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                });
+            });
+        };
+        
+        // Tối ưu hóa cho thiết bị di động - Điều chỉnh chiều cao của các phần tử
+        function optimizeForMobile() {
+            if (window.innerWidth <= 640) {
+                // Điều chỉnh chiều cao của chat container
+                adjustChatContainerHeight();
+                
+                // Đảm bảo sidebar đóng mặc định trên mobile
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar) {
+                    sidebar.classList.add('-translate-x-full');
+                }
+                
+                // Tối ưu kích thước font chữ và padding
+                document.querySelectorAll('.text-xs').forEach(el => {
+                    el.style.fontSize = '0.8125rem';
+                });
+                
+                // Tối ưu khoảng cách giữa các phần tử
+                document.querySelectorAll('.space-y-4').forEach(el => {
+                    el.classList.remove('space-y-4');
+                    el.classList.add('space-y-2');
+                });
+                
+                // Tối ưu kích thước nút
+                document.querySelectorAll('button').forEach(btn => {
+                    if (!btn.classList.contains('text-sm') && !btn.classList.contains('w-8')) {
+                        btn.style.minHeight = '40px';
+                    }
+                });
+                
+                // Tối ưu kích thước input
+                document.querySelectorAll('input:not([type="file"]), select').forEach(input => {
+                    input.style.minHeight = '38px';
+                });
+                
+                // Tối ưu khoảng cách giữa các phần tử trong form
+                document.querySelectorAll('form .space-y-3, form .space-y-4').forEach(el => {
+                    el.style.gap = '0.5rem';
+                });
+                
+                // Tối ưu hiển thị của dropzone
+                const dropzone = document.getElementById('dropzone');
+                if (dropzone) {
+                    dropzone.style.padding = '1rem';
+                    dropzone.style.minHeight = '100px';
+                }
+                
+                // Tối ưu hiển thị của modal
+                const deleteFileModal = document.getElementById('deleteFileModal');
+                if (deleteFileModal) {
+                    const modalContent = deleteFileModal.querySelector('.relative');
+                    if (modalContent) {
+                        modalContent.style.maxWidth = '90%';
+                        modalContent.style.margin = '0 auto';
+                    }
+                }
+                
+                // Tối ưu hiển thị của các nút xóa tài liệu
+                document.querySelectorAll('.delete-file-btn').forEach(btn => {
+                    btn.style.padding = '8px';
+                    btn.style.marginLeft = '8px';
+                });
+                
+                // Tối ưu hiển thị của form câu hỏi
+                const questionForm = document.getElementById('question-form');
+                if (questionForm) {
+                    questionForm.style.paddingTop = '0.75rem';
+                    questionForm.style.paddingBottom = '0.75rem';
+                }
+                
+                // Tối ưu hiển thị của chat container
+                const chatContainer = document.getElementById('chat-container');
+                if (chatContainer) {
+                    chatContainer.style.padding = '0.5rem';
+                }
+                
+                // Tối ưu hiển thị của thông báo upload_result
+                const uploadResultMessage = document.getElementById('uploadResultMessage');
+                if (uploadResultMessage) {
+                    uploadResultMessage.style.padding = '0.75rem 1.5rem 0.75rem 0.75rem';
+                }
+            } else {
+                // Khôi phục các giá trị mặc định khi không phải thiết bị di động
+                document.querySelectorAll('.text-xs').forEach(el => {
+                    el.style.fontSize = '';
+                });
+                
+                document.querySelectorAll('button').forEach(btn => {
+                    btn.style.minHeight = '';
+                });
+                
+                document.querySelectorAll('input:not([type="file"]), select').forEach(input => {
+                    input.style.minHeight = '';
+                });
+                
+                document.querySelectorAll('form .space-y-3, form .space-y-4').forEach(el => {
+                    el.style.gap = '';
+                });
+                
+                const dropzone = document.getElementById('dropzone');
+                if (dropzone) {
+                    dropzone.style.padding = '';
+                    dropzone.style.minHeight = '';
+                }
+                
+                const deleteFileModal = document.getElementById('deleteFileModal');
+                if (deleteFileModal) {
+                    const modalContent = deleteFileModal.querySelector('.relative');
+                    if (modalContent) {
+                        modalContent.style.maxWidth = '';
+                        modalContent.style.margin = '';
+                    }
+                }
+                
+                document.querySelectorAll('.delete-file-btn').forEach(btn => {
+                    btn.style.padding = '';
+                    btn.style.marginLeft = '';
+                });
+                
+                const questionForm = document.getElementById('question-form');
+                if (questionForm) {
+                    questionForm.style.paddingTop = '';
+                    questionForm.style.paddingBottom = '';
+                }
+                
+                const chatContainer = document.getElementById('chat-container');
+                if (chatContainer) {
+                    chatContainer.style.padding = '';
+                }
+                
+                const uploadResultMessage = document.getElementById('uploadResultMessage');
+                if (uploadResultMessage) {
+                    uploadResultMessage.style.padding = '';
+                }
+            }
+        }
+        
+        // Gọi hàm tối ưu khi tải trang và khi thay đổi kích thước màn hình
+        window.addEventListener('load', optimizeForMobile);
+        window.addEventListener('resize', optimizeForMobile);
+        
+        // Cải tiến xử lý thông báo upload_result
+        function handleUploadResultMessage() {
+            const uploadResultMessage = document.getElementById('uploadResultMessage');
+            if (uploadResultMessage) {
+                // Đảm bảo thông báo hiển thị rõ ràng
+                uploadResultMessage.style.display = 'block';
+                uploadResultMessage.classList.remove('fade-out');
+                uploadResultMessage.style.opacity = '1';
+                
+                // Thêm hiệu ứng fade-out sau 3 giây
+                let messageTimeout = setTimeout(function() {
+                    uploadResultMessage.classList.add('fade-out');
+                    
+                    // Ẩn hoàn toàn sau khi hiệu ứng fade-out hoàn thành
+                    setTimeout(function() {
+                        uploadResultMessage.style.display = 'none';
+                    }, 500); // 500ms là thời gian của hiệu ứng transition
+                }, 3000); // 3000ms = 3 giây
+                
+                // Lưu timeout ID vào thuộc tính của phần tử để có thể hủy nếu cần
+                uploadResultMessage.dataset.timeoutId = messageTimeout;
+                
+                // Xóa thông báo khi người dùng nhấp vào
+                uploadResultMessage.addEventListener('click', function() {
+                    // Hủy timeout hiện tại nếu có
+                    if (this.dataset.timeoutId) {
+                        clearTimeout(parseInt(this.dataset.timeoutId));
+                    }
+                    
+                    // Ẩn thông báo ngay lập tức
+                    this.classList.add('fade-out');
+                    setTimeout(() => {
+                        this.style.display = 'none';
+                    }, 500);
+                });
+                
+                // Thêm khả năng tương tác trên thiết bị di động
+                if ('ontouchstart' in window) {
+                    uploadResultMessage.style.cursor = 'pointer';
+                    uploadResultMessage.setAttribute('title', 'Nhấn để đóng');
+                }
+            }
+        }
+        
+        // Gọi hàm xử lý thông báo khi trang được tải
+        document.addEventListener('DOMContentLoaded', handleUploadResultMessage);
+        
+        // Xử lý form upload để cập nhật thông báo khi có phản hồi mới
+        document.querySelector('form[action="/upload"]').addEventListener('submit', function() {
+            // Lấy nút submit
+            const submitButton = this.querySelector('button[type="submit"]');
+            
+            // Vô hiệu hóa nút và thêm hiệu ứng loading
+            submitButton.disabled = true;
+            submitButton.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Đang xử lý...
+            `;
+            
+            // Hủy timeout hiện tại của thông báo nếu có
+            const uploadResultMessage = document.getElementById('uploadResultMessage');
+            if (uploadResultMessage && uploadResultMessage.dataset.timeoutId) {
+                clearTimeout(parseInt(uploadResultMessage.dataset.timeoutId));
+            }
+        });
+    </script>
+</body>
+</html>

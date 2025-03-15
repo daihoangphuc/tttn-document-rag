@@ -1,0 +1,17 @@
+python-dotenv==1.0.0
+flask 
+pyngrok 
+google-generativeai 
+transformers 
+sentence-transformers 
+PyPDF2 
+python-docx 
+nltk 
+faiss-cpu 
+scikit-learn 
+pandas 
+matplotlib 
+tqdm 
+underthesea 
+pyvi 
+rank_bm25

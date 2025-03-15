@@ -1,0 +1,9 @@
+queries,retrieval_times,answer_times,chunk_counts,chunking_methods
+Cơ chế Hadoop là gì?,3.578603506088257,2.7236859798431396,15,hybrid
+Cơ chế heartbeat là sao?,4.260681390762329,0.9609408378601074,15,hybrid
+Read data là gì trong tài liệu Hadoop?,3.569711446762085,0.7952611446380615,15,hybrid
+Điều 41 gồm?,4.923965930938721,5.094813585281372,30,hybrid
+Chi tiết về Read data trong Hadoop?,4.697588205337524,0.6503055095672607,30,hybrid
+Điều 89 trong luật gồm?,3.689980983734131,9.637588262557983,30,hybrid
+Xe cơ giới gồm những loại nào?,3.0870063304901123,3.279191255569458,15,hybrid
+Làn đường là gì?,3.096736431121826,0.7397584915161133,15,hybrid
