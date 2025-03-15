@@ -1,6 +1,5 @@
 # Biến môi trường
 .env
-
 # Thư mục uploads
 uploads/*
 !uploads/.gitkeep
@@ -33,3 +32,5 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo 
+# file khác 
+performance_metrics.csv

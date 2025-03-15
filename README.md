@@ -176,7 +176,7 @@ Hệ thống hỗ trợ nhiều phương pháp chunking khác nhau:
 6. **Hierarchical**: Chia văn bản theo cấu trúc phân cấp
 7. **Contextual**: Chia văn bản dựa trên ngữ cảnh
 8. **Multi-granularity**: Kết hợp nhiều mức độ chi tiết
-9. **Hybrid**: Kết hợp nhiều phương pháp chunking
+9. **Hybrid**: Kết hợp nhiều phương pháp chunking (Mặc định)
 
 ## Tối ưu hóa hiệu suất
 - Điều chỉnh các tham số chunking trong phần cài đặt
@@ -190,6 +190,3 @@ Hệ thống hỗ trợ nhiều phương pháp chunking khác nhau:
 
 ## Đóng góp
 Vui lòng gửi pull request hoặc mở issue để đóng góp vào dự án.
-
-## Giấy phép
-MIT License 
