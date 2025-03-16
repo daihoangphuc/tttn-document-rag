@@ -3191,14 +3191,26 @@ def upload_file():
     else:
         result_message = f"Không thể xử lý file: {', '.join(failed_files)}"
     
-    return render_template_string(
-        index_html,
-        files=global_all_files,
-        settings=load_settings(),
-        upload_result=result_message,
-        answer=None,
-        sources=None
-    )
+    # Kiểm tra nếu request là AJAX (có header X-Requested-With)
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    
+    if is_ajax:
+        # Trả về JSON nếu là AJAX request
+        return jsonify({
+            'success': len(processed_files) > 0,
+            'message': result_message,
+            'files': global_all_files
+        })
+    else:
+        # Trả về HTML như bình thường
+        return render_template_string(
+            index_html,
+            files=global_all_files,
+            settings=load_settings(),
+            upload_result=result_message,
+            answer=None,
+            sources=None
+        )
 
 # Route cho xóa file
 @app.route('/remove', methods=['POST'])

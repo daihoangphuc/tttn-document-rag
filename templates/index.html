@@ -314,7 +314,7 @@
     <aside id="sidebar" class="fixed top-0 left-0 z-40 w-64 h-screen transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
         <div class="h-full px-2 sm:px-3 py-3 sm:py-4 overflow-y-auto bg-white border-r border-gray-200 dark:bg-gray-800 dark:border-gray-700">
             <div class="flex items-center justify-between mb-3 sm:mb-4">
-                <h2 class="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">RAG System</h2>
+                <!-- <h2 class="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">RAG System</h2> -->
                 <button id="closeSidebar" type="button" class="lg:hidden text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 inline-flex items-center dark:hover:bg-gray-600 dark:hover:text-white">
                     <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
                 </button>
@@ -322,8 +322,22 @@
         
             <!-- Nội dung sidebar -->
             <div class="space-y-4 sm:space-y-6">
+                <!-- Tab navigation -->
+                <div class="border-b border-gray-200 dark:border-gray-700">
+                    <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="sidebar-tabs" role="tablist">
+                        <li class="mr-2" role="presentation">
+                            <button class="inline-block p-2 sm:p-4 border-b-2 rounded-t-lg active" id="documents-tab" data-tabs-target="#documents-content" type="button" role="tab" aria-controls="documents-content" aria-selected="true">Tài liệu</button>
+                        </li>
+                        <li class="mr-2" role="presentation">
+                            <button class="inline-block p-2 sm:p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300" id="history-tab" data-tabs-target="#history-content" type="button" role="tab" aria-controls="history-content" aria-selected="false">Lịch sử</button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Tab content -->
+                <div id="sidebar-tab-content">
                 <!-- Phần tài liệu đã tải lên -->
-                <div>
+                    <div class="block" id="documents-content" role="tabpanel" aria-labelledby="documents-tab">
                     <h3 class="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-500 uppercase dark:text-gray-400">Tài liệu đã tải lên</h3>
                     <div class="space-y-1 sm:space-y-2">
             {% if files %}
@@ -341,13 +355,12 @@
             {% else %}
                             <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Chưa có tài liệu nào.</p>
             {% endif %}
-                    </div>
         </div>
         
                 <!-- Phần upload tài liệu -->
-                <div>
+                        <div class="mt-4">
                     <h3 class="mb-2 sm:mb-3 text-xs sm:text-sm font-medium text-gray-500 uppercase dark:text-gray-400">Tải lên tài liệu mới</h3>
-                    <form action="/upload" method="post" enctype="multipart/form-data" class="space-y-3 sm:space-y-4">
+                    <form id="upload-form" action="/upload" method="post" enctype="multipart/form-data" class="space-y-3 sm:space-y-4">
                         <div id="dropzone" class="dropzone">
                             <label for="file-upload" class="cursor-pointer">
                                 <svg class="w-6 h-6 sm:w-8 sm:h-8 mb-1 sm:mb-2 text-gray-500 dark:text-gray-400 mx-auto" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
@@ -373,7 +386,7 @@
                 </select>
                         </div>
                 
-                        <button type="submit" class="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-xs sm:text-sm px-3 sm:px-5 py-2 sm:py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Tải lên</button>
+                        <button type="button" id="upload-button" class="w-full text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-xs sm:text-sm px-3 sm:px-5 py-2 sm:py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Tải lên</button>
             </form>
             
             {% if upload_result %}
@@ -381,15 +394,26 @@
                         {{ upload_result }}
                     </div>
             {% endif %}
+                        </div>
         </div>
         
-                <!-- Nút mở cài đặt -->
-                <!-- <div>
-                    <button id="settingsButton" class="w-full flex items-center p-1.5 sm:p-2 text-sm font-normal text-gray-900 rounded-lg hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700">
-                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-gray-500 transition duration-75 dark:text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z"></path></svg>
-                        <span class="ml-3 text-xs sm:text-sm">Cài đặt</span>
+                    <!-- Phần lịch sử chat -->
+                    <div class="hidden" id="history-content" role="tabpanel" aria-labelledby="history-tab">
+                        <div class="flex items-center justify-between mb-2 sm:mb-3">
+                            <h2 class="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">Lịch sử chat</h2>
+                            <button id="new-chat-btn" type="button" class="text-xs sm:text-sm text-blue-600 hover:text-blue-800 dark:text-blue-500 dark:hover:text-blue-400 flex items-center">
+                                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                </svg>
+                                Tạo mới
                     </button>
-                </div> -->
+                        </div>
+                        
+                        <div class="space-y-1 sm:space-y-2 max-h-[60vh] overflow-y-auto" id="chat-history-list">
+                            <!-- Danh sách lịch sử chat sẽ được thêm vào đây bằng JavaScript -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </aside>
@@ -612,6 +636,250 @@
             });
         }
         
+        // Xử lý tab trong sidebar
+        const tabButtons = document.querySelectorAll('[role="tab"]');
+        const tabContents = document.querySelectorAll('[role="tabpanel"]');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Xóa trạng thái active của tất cả các tab
+                tabButtons.forEach(btn => {
+                    btn.classList.remove('active', 'border-blue-600', 'text-blue-600');
+                    btn.classList.add('border-transparent');
+                    btn.setAttribute('aria-selected', 'false');
+                });
+                
+                // Ẩn tất cả nội dung tab
+                tabContents.forEach(content => {
+                    content.classList.add('hidden');
+                });
+                
+                // Hiển thị tab được chọn
+                button.classList.add('active', 'border-blue-600', 'text-blue-600');
+                button.classList.remove('border-transparent');
+                button.setAttribute('aria-selected', 'true');
+                
+                // Lấy ID của nội dung tab cần hiển thị
+                const tabContentId = button.getAttribute('data-tabs-target').substring(1);
+                document.getElementById(tabContentId).classList.remove('hidden');
+            });
+        });
+        
+        // Xử lý lịch sử chat
+        // Lưu trữ lịch sử chat trong localStorage
+        function saveChatHistory(chatId, title, messages, timestamp) {
+            // Lấy lịch sử chat hiện tại từ localStorage
+            let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+            
+            // Thêm chat mới hoặc cập nhật chat hiện có
+            const existingChatIndex = chatHistory.findIndex(chat => chat.id === chatId);
+            
+            if (existingChatIndex !== -1) {
+                // Cập nhật chat hiện có
+                chatHistory[existingChatIndex] = {
+                    id: chatId,
+                    title: title,
+                    messages: messages,
+                    timestamp: timestamp || new Date().toISOString()
+                };
+            } else {
+                // Thêm chat mới
+                chatHistory.push({
+                    id: chatId || Date.now().toString(),
+                    title: title || `Đoạn hội thoại ${chatHistory.length + 1}`,
+                    messages: messages || [],
+                    timestamp: timestamp || new Date().toISOString()
+                });
+            }
+            
+            // Lưu lại vào localStorage
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            
+            // Cập nhật giao diện
+            updateChatHistoryUI();
+        }
+        
+        // Lấy lịch sử chat từ localStorage
+        function getChatHistory() {
+            return JSON.parse(localStorage.getItem('chatHistory') || '[]');
+        }
+        
+        // Xóa một đoạn chat từ lịch sử
+        function deleteChatHistory(chatId) {
+            let chatHistory = getChatHistory();
+            chatHistory = chatHistory.filter(chat => chat.id !== chatId);
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            updateChatHistoryUI();
+        }
+        
+        // Cập nhật giao diện hiển thị lịch sử chat
+        function updateChatHistoryUI() {
+            const chatHistoryList = document.getElementById('chat-history-list');
+            const chatHistory = getChatHistory();
+            
+            // Xóa nội dung hiện tại
+            chatHistoryList.innerHTML = '';
+            
+            if (chatHistory.length === 0) {
+                chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Chưa có đoạn hội thoại nào.</p>';
+                return;
+            }
+            
+            // Sắp xếp lịch sử chat theo thời gian giảm dần (mới nhất lên đầu)
+            chatHistory.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            // Thêm các mục lịch sử chat vào danh sách
+            chatHistory.forEach(chat => {
+                const date = new Date(chat.timestamp);
+                const formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+                
+                const chatItem = document.createElement('div');
+                chatItem.className = 'chat-history-item flex items-center justify-between p-1.5 sm:p-2 text-sm font-normal text-gray-900 rounded-lg hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700 cursor-pointer';
+                chatItem.dataset.chatId = chat.id;
+                
+                chatItem.innerHTML = `
+                    <div class="truncate">
+                        <span class="flex-1 text-xs sm:text-sm">${chat.title}</span>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">${formattedDate}</p>
+                    </div>
+                    <button type="button" class="delete-chat-btn text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400" data-chat-id="${chat.id}">
+                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                    </button>
+                `;
+                
+                chatHistoryList.appendChild(chatItem);
+                
+                // Thêm sự kiện click để tải lại đoạn chat
+                chatItem.addEventListener('click', function(e) {
+                    if (!e.target.closest('.delete-chat-btn')) {
+                        loadChat(chat.id);
+                    }
+                });
+            });
+            
+            // Thêm sự kiện xóa chat
+            document.querySelectorAll('.delete-chat-btn').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const chatId = this.getAttribute('data-chat-id');
+                    
+                    if (confirm('Bạn có chắc chắn muốn xóa đoạn hội thoại này không?')) {
+                        deleteChatHistory(chatId);
+                    }
+                });
+            });
+        }
+        
+        // Tải một đoạn chat từ lịch sử
+        function loadChat(chatId) {
+            const chatHistory = getChatHistory();
+            const chat = chatHistory.find(c => c.id === chatId);
+            
+            if (!chat) return;
+            
+            // Xóa các tin nhắn hiện tại
+            const chatContainer = document.getElementById('chat-container');
+            chatContainer.innerHTML = '';
+            
+            // Thêm tin nhắn chào mừng
+            const welcomeMessage = document.createElement('div');
+            welcomeMessage.className = 'chat-message bot-message';
+            welcomeMessage.innerHTML = '<p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">Xin chào! Tôi là trợ lý AI. Bạn có thể đặt câu hỏi về các tài liệu đã tải lên.</p>';
+            chatContainer.appendChild(welcomeMessage);
+            
+            // Thêm các tin nhắn từ lịch sử
+            chat.messages.forEach(message => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `chat-message ${message.role === 'user' ? 'user-message' : 'bot-message'}`;
+                messageDiv.innerHTML = `<p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">${message.content}</p>`;
+                chatContainer.appendChild(messageDiv);
+            });
+            
+            // Cuộn xuống cuối
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Đóng sidebar trên thiết bị di động
+            if (window.innerWidth < 1024) {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+            }
+            
+            // Lưu ID chat hiện tại vào sessionStorage
+            sessionStorage.setItem('currentChatId', chatId);
+        }
+        
+        // Tạo đoạn chat mới
+        function createNewChat() {
+            // Xóa các tin nhắn hiện tại
+            const chatContainer = document.getElementById('chat-container');
+            chatContainer.innerHTML = '';
+            
+            // Thêm tin nhắn chào mừng
+            const welcomeMessage = document.createElement('div');
+            welcomeMessage.className = 'chat-message bot-message';
+            welcomeMessage.innerHTML = '<p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">Xin chào! Tôi là trợ lý AI. Bạn có thể đặt câu hỏi về các tài liệu đã tải lên.</p>';
+            chatContainer.appendChild(welcomeMessage);
+            
+            // Tạo ID chat mới
+            const newChatId = Date.now().toString();
+            
+            // Lưu chat mới vào lịch sử
+            saveChatHistory(newChatId, `Đoạn hội thoại mới`, [], new Date().toISOString());
+            
+            // Lưu ID chat hiện tại vào sessionStorage
+            sessionStorage.setItem('currentChatId', newChatId);
+            
+            // Đóng sidebar trên thiết bị di động
+            if (window.innerWidth < 1024) {
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+            }
+        }
+        
+        // Lưu tin nhắn vào lịch sử chat hiện tại
+        function saveMessageToCurrentChat(role, content) {
+            const currentChatId = sessionStorage.getItem('currentChatId');
+            
+            if (!currentChatId) {
+                // Nếu chưa có chat hiện tại, tạo mới
+                const newChatId = Date.now().toString();
+                sessionStorage.setItem('currentChatId', newChatId);
+                
+                saveChatHistory(newChatId, `Đoạn hội thoại ${getChatHistory().length + 1}`, [
+                    { role, content }
+                ]);
+                return;
+            }
+            
+            // Lấy chat hiện tại từ lịch sử
+            const chatHistory = getChatHistory();
+            const currentChat = chatHistory.find(chat => chat.id === currentChatId);
+            
+            if (!currentChat) {
+                // Nếu không tìm thấy chat hiện tại, tạo mới
+                saveChatHistory(currentChatId, `Đoạn hội thoại ${chatHistory.length + 1}`, [
+                    { role, content }
+                ]);
+                return;
+            }
+            
+            // Thêm tin nhắn vào chat hiện tại
+            currentChat.messages.push({ role, content });
+            
+            // Cập nhật tiêu đề nếu là tin nhắn đầu tiên từ người dùng
+            if (role === 'user' && currentChat.messages.filter(m => m.role === 'user').length === 1) {
+                // Lấy 30 ký tự đầu tiên của tin nhắn làm tiêu đề
+                currentChat.title = content.length > 30 ? content.substring(0, 30) + '...' : content;
+            }
+            
+            // Cập nhật thời gian
+            currentChat.timestamp = new Date().toISOString();
+            
+            // Lưu lại vào localStorage
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            
+            // Cập nhật giao diện
+            updateChatHistoryUI();
+        }
+        
         // Xử lý kích thước màn hình thay đổi
         window.addEventListener('resize', function() {
             if (window.innerWidth >= 1024) {
@@ -649,224 +917,6 @@
         
         // Điều chỉnh chiều cao ban đầu
         window.addEventListener('load', adjustChatContainerHeight);
-        
-        // Xử lý modal cài đặt
-        const settingsButton = document.getElementById('settingsButton');
-        if (settingsButton) {
-            settingsButton.addEventListener('click', function() {
-                const modal = document.getElementById('settingsModal');
-                modal.classList.remove('hidden');
-                modal.setAttribute('aria-hidden', 'false');
-            });
-        }
-        
-        // Đóng modal khi nhấn nút đóng
-        document.querySelectorAll('[data-modal-hide="settingsModal"]').forEach(button => {
-            button.addEventListener('click', function() {
-                const modal = document.getElementById('settingsModal');
-                modal.classList.add('hidden');
-                modal.setAttribute('aria-hidden', 'true');
-            });
-        });
-        
-        // Xử lý drag and drop cho upload file
-        const dropzone = document.getElementById('dropzone');
-        const fileInput = document.getElementById('file-upload');
-        
-        if (dropzone && fileInput) {
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropzone.addEventListener(eventName, preventDefaults, false);
-            });
-            
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropzone.addEventListener(eventName, highlight, false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropzone.addEventListener(eventName, unhighlight, false);
-            });
-            
-            function highlight() {
-                dropzone.classList.add('active');
-            }
-            
-            function unhighlight() {
-                dropzone.classList.remove('active');
-            }
-            
-            dropzone.addEventListener('drop', handleDrop, false);
-            
-            function handleDrop(e) {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                fileInput.files = files;
-                
-                // Hiển thị tên file khi kéo thả
-                if (files.length > 0) {
-                    displayFileNames(files);
-                }
-            }
-            
-            // Hiển thị tên file khi chọn
-            fileInput.addEventListener('change', function() {
-                if (fileInput.files.length > 0) {
-                    displayFileNames(fileInput.files);
-                }
-            });
-            
-            function displayFileNames(files) {
-                // Xóa thông báo file cũ nếu có
-                const oldFileNameDisplay = dropzone.querySelector('.file-list');
-                if (oldFileNameDisplay) {
-                    oldFileNameDisplay.remove();
-                }
-                
-                const fileListContainer = document.createElement('div');
-                fileListContainer.className = 'file-list mt-2 text-sm text-gray-600 dark:text-gray-400';
-                
-                if (files.length === 1) {
-                    const fileNameDisplay = document.createElement('p');
-                    fileNameDisplay.textContent = `File đã chọn: ${files[0].name}`;
-                    fileListContainer.appendChild(fileNameDisplay);
-                } else {
-                    const fileCountDisplay = document.createElement('p');
-                    fileCountDisplay.textContent = `Đã chọn ${files.length} file:`;
-                    fileListContainer.appendChild(fileCountDisplay);
-                    
-                    const fileList = document.createElement('ul');
-                    fileList.className = 'list-disc pl-5 mt-1';
-                    
-                    for (let i = 0; i < files.length; i++) {
-                        const fileItem = document.createElement('li');
-                        fileItem.textContent = files[i].name;
-                        fileList.appendChild(fileItem);
-                    }
-                    
-                    fileListContainer.appendChild(fileList);
-                }
-                
-                dropzone.appendChild(fileListContainer);
-            }
-        }
-        
-        // Cuộn xuống cuối khu vực chat khi tải trang
-        window.onload = function() {
-            const chatContainer = document.getElementById('chat-container');
-            if (chatContainer) {
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-            }
-            
-            // Đồng bộ giá trị từ các trường tùy chọn vào form
-            syncFormValues();
-            
-            // Xử lý xác nhận xóa tài liệu
-            const deleteButtons = document.querySelectorAll('.delete-file-btn');
-            const deleteFileModal = document.getElementById('deleteFileModal');
-            const fileToDeleteSpan = document.getElementById('fileToDelete');
-            const deleteFilenameInput = document.getElementById('deleteFilename');
-            
-            // Thêm sự kiện click cho mỗi nút
-            deleteButtons.forEach(button => {
-                button.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    // Lấy tên file từ thuộc tính data-filename
-                    const filename = this.getAttribute('data-filename');
-                    
-                    // Cập nhật modal với tên file
-                    fileToDeleteSpan.textContent = filename;
-                    deleteFilenameInput.value = filename;
-                    
-                    // Hiển thị modal xác nhận
-                    deleteFileModal.classList.remove('hidden');
-                    
-                    // Đảm bảo modal nằm giữa màn hình
-                    centerModal(deleteFileModal);
-                });
-            });
-            
-            // Xử lý đóng modal
-            document.querySelectorAll('[data-modal-hide="deleteFileModal"]').forEach(button => {
-                button.addEventListener('click', function() {
-                    deleteFileModal.classList.add('hidden');
-                });
-            });
-            
-            // Đóng modal khi click bên ngoài
-            deleteFileModal.addEventListener('click', function(e) {
-                if (e.target === this) {
-                    this.classList.add('hidden');
-                }
-            });
-            
-            // Xử lý form xóa tài liệu
-            const deleteFileForm = document.getElementById('deleteFileForm');
-            if (deleteFileForm) {
-                deleteFileForm.addEventListener('submit', function(e) {
-                    // Hiển thị trạng thái đang xử lý
-                    const submitButton = this.querySelector('button[type="submit"]');
-                    submitButton.disabled = true;
-                    submitButton.innerHTML = `
-                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Đang xóa...
-                    `;
-                });
-            }
-            
-            // Hàm để căn giữa modal
-            function centerModal(modal) {
-                if (!modal) return;
-                
-                // Không cần tính toán vị trí nữa vì đã sử dụng CSS để căn giữa
-                // Chỉ cần đảm bảo modal hiển thị
-                modal.classList.remove('hidden');
-            }
-            
-            // Đồng bộ giá trị từ các trường tùy chọn vào form
-            function syncFormValues() {
-                const modelSelect = document.getElementById('model');
-                const topKInput = document.getElementById('top_k');
-                const thresholdInput = document.getElementById('threshold');
-                
-                const formModel = document.getElementById('form-model');
-                const formTopK = document.getElementById('form-top_k');
-                const formThreshold = document.getElementById('form-threshold');
-                
-                if (modelSelect && formModel) {
-                    // Đồng bộ giá trị ban đầu
-                    formModel.value = modelSelect.value;
-                    
-                    // Lắng nghe sự thay đổi
-                    modelSelect.addEventListener('change', function() {
-                        formModel.value = this.value;
-                    });
-                }
-                
-                if (topKInput && formTopK) {
-                    formTopK.value = topKInput.value;
-                    
-                    topKInput.addEventListener('change', function() {
-                        formTopK.value = this.value;
-                    });
-                }
-                
-                if (thresholdInput && formThreshold) {
-                    formThreshold.value = thresholdInput.value;
-                    
-                    thresholdInput.addEventListener('change', function() {
-                        formThreshold.value = this.value;
-                    });
-                }
-            }
             
             // Hiển thị hiệu ứng đang soạn tin khi gửi form
             document.getElementById('question-form').addEventListener('submit', function(e) {
@@ -895,6 +945,9 @@
                 userMessage.className = 'chat-message user-message';
                 userMessage.innerHTML = `<p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">${question}</p>`;
                 chatContainer.appendChild(userMessage);
+            
+            // Lưu tin nhắn người dùng vào lịch sử chat
+            saveMessageToCurrentChat('user', question);
                 
                 // Hiển thị typing indicator
                 const typingIndicator = document.getElementById('typing-indicator');
@@ -968,6 +1021,10 @@
                         
                         // Thêm vào container
                         chatContainer.appendChild(botMessageDiv);
+                    
+                    // Lưu tin nhắn bot vào lịch sử chat
+                    const botContent = botMessageDiv.textContent || botMessageDiv.innerText;
+                    saveMessageToCurrentChat('bot', botContent);
                         
                         // Cuộn xuống để hiển thị tin nhắn mới
                         chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -978,6 +1035,10 @@
                         botMessageDiv.className = 'chat-message bot-message';
                         botMessageDiv.innerHTML = `<p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">${html}</p>`;
                         chatContainer.appendChild(botMessageDiv);
+                    
+                    // Lưu tin nhắn bot vào lịch sử chat
+                    saveMessageToCurrentChat('bot', html);
+                    
                         chatContainer.scrollTop = chatContainer.scrollHeight;
                     }
                     
@@ -997,6 +1058,9 @@
                     errorMessage.className = 'chat-message bot-message';
                     errorMessage.innerHTML = `<p class="text-red-500 dark:text-red-400 text-sm sm:text-base">Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.</p>`;
                     chatContainer.appendChild(errorMessage);
+                
+                // Lưu tin nhắn lỗi vào lịch sử chat
+                saveMessageToCurrentChat('bot', 'Đã xảy ra lỗi khi xử lý yêu cầu của bạn. Vui lòng thử lại.');
                     
                     // Cuộn xuống để hiển thị tin nhắn lỗi
                     chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -1006,217 +1070,429 @@
                     submitButton.classList.remove('opacity-50', 'cursor-not-allowed');
                 });
             });
-        };
         
-        // Tối ưu hóa cho thiết bị di động - Điều chỉnh chiều cao của các phần tử
-        function optimizeForMobile() {
-            if (window.innerWidth <= 640) {
-                // Điều chỉnh chiều cao của chat container
-                adjustChatContainerHeight();
-                
-                // Đảm bảo sidebar đóng mặc định trên mobile
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar) {
-                    sidebar.classList.add('-translate-x-full');
-                }
-                
-                // Tối ưu kích thước font chữ và padding
-                document.querySelectorAll('.text-xs').forEach(el => {
-                    el.style.fontSize = '0.8125rem';
-                });
-                
-                // Tối ưu khoảng cách giữa các phần tử
-                document.querySelectorAll('.space-y-4').forEach(el => {
-                    el.classList.remove('space-y-4');
-                    el.classList.add('space-y-2');
-                });
-                
-                // Tối ưu kích thước nút
-                document.querySelectorAll('button').forEach(btn => {
-                    if (!btn.classList.contains('text-sm') && !btn.classList.contains('w-8')) {
-                        btn.style.minHeight = '40px';
-                    }
-                });
-                
-                // Tối ưu kích thước input
-                document.querySelectorAll('input:not([type="file"]), select').forEach(input => {
-                    input.style.minHeight = '38px';
-                });
-                
-                // Tối ưu khoảng cách giữa các phần tử trong form
-                document.querySelectorAll('form .space-y-3, form .space-y-4').forEach(el => {
-                    el.style.gap = '0.5rem';
-                });
-                
-                // Tối ưu hiển thị của dropzone
-                const dropzone = document.getElementById('dropzone');
-                if (dropzone) {
-                    dropzone.style.padding = '1rem';
-                    dropzone.style.minHeight = '100px';
-                }
-                
-                // Tối ưu hiển thị của modal
-                const deleteFileModal = document.getElementById('deleteFileModal');
-                if (deleteFileModal) {
-                    const modalContent = deleteFileModal.querySelector('.relative');
-                    if (modalContent) {
-                        modalContent.style.maxWidth = '90%';
-                        modalContent.style.margin = '0 auto';
-                    }
-                }
-                
-                // Tối ưu hiển thị của các nút xóa tài liệu
-                document.querySelectorAll('.delete-file-btn').forEach(btn => {
-                    btn.style.padding = '8px';
-                    btn.style.marginLeft = '8px';
-                });
-                
-                // Tối ưu hiển thị của form câu hỏi
-                const questionForm = document.getElementById('question-form');
-                if (questionForm) {
-                    questionForm.style.paddingTop = '0.75rem';
-                    questionForm.style.paddingBottom = '0.75rem';
-                }
-                
-                // Tối ưu hiển thị của chat container
-                const chatContainer = document.getElementById('chat-container');
-                if (chatContainer) {
-                    chatContainer.style.padding = '0.5rem';
-                }
-                
-                // Tối ưu hiển thị của thông báo upload_result
-                const uploadResultMessage = document.getElementById('uploadResultMessage');
-                if (uploadResultMessage) {
-                    uploadResultMessage.style.padding = '0.75rem 1.5rem 0.75rem 0.75rem';
-                }
-            } else {
-                // Khôi phục các giá trị mặc định khi không phải thiết bị di động
-                document.querySelectorAll('.text-xs').forEach(el => {
-                    el.style.fontSize = '';
-                });
-                
-                document.querySelectorAll('button').forEach(btn => {
-                    btn.style.minHeight = '';
-                });
-                
-                document.querySelectorAll('input:not([type="file"]), select').forEach(input => {
-                    input.style.minHeight = '';
-                });
-                
-                document.querySelectorAll('form .space-y-3, form .space-y-4').forEach(el => {
-                    el.style.gap = '';
-                });
-                
-                const dropzone = document.getElementById('dropzone');
-                if (dropzone) {
-                    dropzone.style.padding = '';
-                    dropzone.style.minHeight = '';
-                }
-                
-                const deleteFileModal = document.getElementById('deleteFileModal');
-                if (deleteFileModal) {
-                    const modalContent = deleteFileModal.querySelector('.relative');
-                    if (modalContent) {
-                        modalContent.style.maxWidth = '';
-                        modalContent.style.margin = '';
-                    }
-                }
-                
-                document.querySelectorAll('.delete-file-btn').forEach(btn => {
-                    btn.style.padding = '';
-                    btn.style.marginLeft = '';
-                });
-                
-                const questionForm = document.getElementById('question-form');
-                if (questionForm) {
-                    questionForm.style.paddingTop = '';
-                    questionForm.style.paddingBottom = '';
-                }
-                
-                const chatContainer = document.getElementById('chat-container');
-                if (chatContainer) {
-                    chatContainer.style.padding = '';
-                }
-                
-                const uploadResultMessage = document.getElementById('uploadResultMessage');
-                if (uploadResultMessage) {
-                    uploadResultMessage.style.padding = '';
-                }
-            }
-        }
-        
-        // Gọi hàm tối ưu khi tải trang và khi thay đổi kích thước màn hình
-        window.addEventListener('load', optimizeForMobile);
-        window.addEventListener('resize', optimizeForMobile);
-        
-        // Cải tiến xử lý thông báo upload_result
-        function handleUploadResultMessage() {
-            const uploadResultMessage = document.getElementById('uploadResultMessage');
-            if (uploadResultMessage) {
-                // Đảm bảo thông báo hiển thị rõ ràng
-                uploadResultMessage.style.display = 'block';
-                uploadResultMessage.classList.remove('fade-out');
-                uploadResultMessage.style.opacity = '1';
-                
-                // Thêm hiệu ứng fade-out sau 3 giây
-                let messageTimeout = setTimeout(function() {
-                    uploadResultMessage.classList.add('fade-out');
-                    
-                    // Ẩn hoàn toàn sau khi hiệu ứng fade-out hoàn thành
-                    setTimeout(function() {
-                        uploadResultMessage.style.display = 'none';
-                    }, 500); // 500ms là thời gian của hiệu ứng transition
-                }, 3000); // 3000ms = 3 giây
-                
-                // Lưu timeout ID vào thuộc tính của phần tử để có thể hủy nếu cần
-                uploadResultMessage.dataset.timeoutId = messageTimeout;
-                
-                // Xóa thông báo khi người dùng nhấp vào
-                uploadResultMessage.addEventListener('click', function() {
-                    // Hủy timeout hiện tại nếu có
-                    if (this.dataset.timeoutId) {
-                        clearTimeout(parseInt(this.dataset.timeoutId));
-                    }
-                    
-                    // Ẩn thông báo ngay lập tức
-                    this.classList.add('fade-out');
-                    setTimeout(() => {
-                        this.style.display = 'none';
-                    }, 500);
-                });
-                
-                // Thêm khả năng tương tác trên thiết bị di động
-                if ('ontouchstart' in window) {
-                    uploadResultMessage.style.cursor = 'pointer';
-                    uploadResultMessage.setAttribute('title', 'Nhấn để đóng');
-                }
-            }
-        }
-        
-        // Gọi hàm xử lý thông báo khi trang được tải
-        document.addEventListener('DOMContentLoaded', handleUploadResultMessage);
-        
-        // Xử lý form upload để cập nhật thông báo khi có phản hồi mới
-        document.querySelector('form[action="/upload"]').addEventListener('submit', function() {
-            // Lấy nút submit
-            const submitButton = this.querySelector('button[type="submit"]');
+        // Khởi tạo khi trang được tải
+        window.onload = function() {
+            // Cập nhật giao diện lịch sử chat
+            updateChatHistoryUI();
             
-            // Vô hiệu hóa nút và thêm hiệu ứng loading
+            // Thêm sự kiện cho nút tạo chat mới
+            document.getElementById('new-chat-btn').addEventListener('click', createNewChat);
+            
+            // Kiểm tra xem có chat hiện tại không
+            const currentChatId = sessionStorage.getItem('currentChatId');
+            if (currentChatId) {
+                // Tải chat hiện tại
+                loadChat(currentChatId);
+            }
+            
+            // Cuộn xuống cuối khu vực chat
+            const chatContainer = document.getElementById('chat-container');
+            if (chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+            
+            // Đồng bộ giá trị từ các trường tùy chọn vào form
+            syncFormValues();
+            
+            // Thiết lập sự kiện cho các nút xóa tài liệu
+            setupDeleteButtons();
+            
+            // Xử lý modal cài đặt
+            const settingsButton = document.getElementById('settingsButton');
+            if (settingsButton) {
+                settingsButton.addEventListener('click', function() {
+                    const modal = document.getElementById('settingsModal');
+                    modal.classList.remove('hidden');
+                    modal.setAttribute('aria-hidden', 'false');
+                });
+            }
+            
+            // Đóng modal khi nhấn nút đóng
+            document.querySelectorAll('[data-modal-hide="settingsModal"]').forEach(button => {
+                button.addEventListener('click', function() {
+                    const modal = document.getElementById('settingsModal');
+                    modal.classList.add('hidden');
+                    modal.setAttribute('aria-hidden', 'true');
+                });
+            });
+            
+            // Xử lý drag and drop cho upload file
+                const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('file-upload');
+            
+            if (dropzone && fileInput) {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, preventDefaults, false);
+                });
+                
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, highlight, false);
+                });
+                
+                ['dragleave', 'drop'].forEach(eventName => {
+                    dropzone.addEventListener(eventName, unhighlight, false);
+                });
+                
+                function highlight() {
+                    dropzone.classList.add('active');
+                }
+                
+                function unhighlight() {
+                    dropzone.classList.remove('active');
+                }
+                
+                dropzone.addEventListener('drop', handleDrop, false);
+                
+                function handleDrop(e) {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    fileInput.files = files;
+                    
+                    // Hiển thị tên file khi kéo thả
+                    if (files.length > 0) {
+                        displayFileNames(files);
+                    }
+                }
+                
+                // Hiển thị tên file khi chọn
+                fileInput.addEventListener('change', function() {
+                    if (fileInput.files.length > 0) {
+                        displayFileNames(fileInput.files);
+                    }
+                });
+                
+                function displayFileNames(files) {
+                    // Xóa thông báo file cũ nếu có
+                    const oldFileNameDisplay = dropzone.querySelector('.file-list');
+                    if (oldFileNameDisplay) {
+                        oldFileNameDisplay.remove();
+                    }
+                    
+                    const fileListContainer = document.createElement('div');
+                    fileListContainer.className = 'file-list mt-2 text-sm text-gray-600 dark:text-gray-400';
+                    
+                    if (files.length === 1) {
+                        const fileNameDisplay = document.createElement('p');
+                        fileNameDisplay.textContent = `File đã chọn: ${files[0].name}`;
+                        fileListContainer.appendChild(fileNameDisplay);
+                    } else {
+                        const fileCountDisplay = document.createElement('p');
+                        fileCountDisplay.textContent = `Đã chọn ${files.length} file:`;
+                        fileListContainer.appendChild(fileCountDisplay);
+                        
+                        const fileList = document.createElement('ul');
+                        fileList.className = 'list-disc pl-5 mt-1';
+                        
+                        for (let i = 0; i < files.length; i++) {
+                            const fileItem = document.createElement('li');
+                            fileItem.textContent = files[i].name;
+                            fileList.appendChild(fileItem);
+                        }
+                        
+                        fileListContainer.appendChild(fileList);
+                    }
+                    
+                    dropzone.appendChild(fileListContainer);
+                }
+            }
+            
+            // Xử lý xác nhận xóa tài liệu
+            const deleteButtons = document.querySelectorAll('.delete-file-btn');
+            const deleteFileModal = document.getElementById('deleteFileModal');
+            const fileToDeleteSpan = document.getElementById('fileToDelete');
+            const deleteFilenameInput = document.getElementById('deleteFilename');
+            
+            // Thêm sự kiện click cho mỗi nút
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Lấy tên file từ thuộc tính data-filename
+                    const filename = this.getAttribute('data-filename');
+                    
+                    // Cập nhật modal với tên file
+                    fileToDeleteSpan.textContent = filename;
+                    deleteFilenameInput.value = filename;
+                    
+                    // Hiển thị modal xác nhận
+                    deleteFileModal.classList.remove('hidden');
+                });
+            });
+            
+            // Xử lý đóng modal
+            document.querySelectorAll('[data-modal-hide="deleteFileModal"]').forEach(button => {
+                button.addEventListener('click', function() {
+                    deleteFileModal.classList.add('hidden');
+                });
+            });
+            
+            // Đóng modal khi click bên ngoài
+            deleteFileModal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.add('hidden');
+                }
+            });
+            
+            // Xử lý form xóa tài liệu
+            const deleteFileForm = document.getElementById('deleteFileForm');
+            if (deleteFileForm) {
+                deleteFileForm.addEventListener('submit', function(e) {
+                    // Hiển thị trạng thái đang xử lý
+            const submitButton = this.querySelector('button[type="submit"]');
             submitButton.disabled = true;
             submitButton.innerHTML = `
                 <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Đang xử lý...
-            `;
+                        Đang xóa...
+                    `;
+                });
+            }
+        };
+        
+        // Đồng bộ giá trị từ các trường tùy chọn vào form
+        function syncFormValues() {
+            const modelSelect = document.getElementById('model');
+            const topKInput = document.getElementById('top_k');
+            const thresholdInput = document.getElementById('threshold');
             
-            // Hủy timeout hiện tại của thông báo nếu có
-            const uploadResultMessage = document.getElementById('uploadResultMessage');
-            if (uploadResultMessage && uploadResultMessage.dataset.timeoutId) {
-                clearTimeout(parseInt(uploadResultMessage.dataset.timeoutId));
+            const formModel = document.getElementById('form-model');
+            const formTopK = document.getElementById('form-top_k');
+            const formThreshold = document.getElementById('form-threshold');
+            
+            if (modelSelect && formModel) {
+                // Đồng bộ giá trị ban đầu
+                formModel.value = modelSelect.value;
+                
+                // Lắng nghe sự thay đổi
+                modelSelect.addEventListener('change', function() {
+                    formModel.value = this.value;
+                });
+            }
+            
+            if (topKInput && formTopK) {
+                formTopK.value = topKInput.value;
+                
+                topKInput.addEventListener('change', function() {
+                    formTopK.value = this.value;
+                });
+            }
+            
+            if (thresholdInput && formThreshold) {
+                formThreshold.value = thresholdInput.value;
+                
+                thresholdInput.addEventListener('change', function() {
+                    formThreshold.value = this.value;
+                });
+            }
+        }
+        
+        // Thiết lập xử lý form upload bằng AJAX
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadForm = document.getElementById('upload-form');
+            const uploadButton = document.getElementById('upload-button');
+            
+            if (uploadForm && uploadButton) {
+                uploadButton.addEventListener('click', function() {
+                    // Kiểm tra xem có file được chọn không
+                    const fileInput = document.getElementById('file-upload');
+                    if (fileInput.files.length === 0) {
+                        alert('Vui lòng chọn ít nhất một file để tải lên.');
+                        return;
+                    }
+                    
+                    // Hiển thị trạng thái đang xử lý
+                    uploadButton.disabled = true;
+                    uploadButton.innerHTML = `
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Đang xử lý...
+                    `;
+                    
+                    // Tạo FormData từ form
+                    const formData = new FormData(uploadForm);
+                    
+                    // Gửi request AJAX
+                    fetch('/upload', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.headers.get('content-type').includes('application/json')) {
+                            return response.json();
+                        } else {
+                            return response.text().then(text => {
+                                // Xử lý phản hồi HTML như trước
+                                const tempDiv = document.createElement('div');
+                                tempDiv.innerHTML = text;
+                                return { html: tempDiv, isHtml: true };
+                            });
+                        }
+                    })
+                    .then(data => {
+                        if (data.isHtml) {
+                            // Xử lý phản hồi HTML như trước
+                            const tempDiv = data.html;
+                            
+                            // Lấy danh sách tài liệu mới
+                            const newFilesList = tempDiv.querySelector('#documents-content .space-y-1');
+                            if (newFilesList) {
+                                // Cập nhật danh sách tài liệu
+                                const currentFilesList = document.querySelector('#documents-content .space-y-1');
+                                if (currentFilesList) {
+                                    currentFilesList.innerHTML = newFilesList.innerHTML;
+                                    
+                                    // Thêm lại sự kiện cho các nút xóa
+                                    setupDeleteButtons();
+                                }
+                            }
+                            
+                            // Lấy thông báo kết quả
+                            const uploadResultContent = tempDiv.querySelector('#uploadResultMessage');
+                            if (uploadResultContent) {
+                                // Tạo hoặc cập nhật thông báo kết quả
+                                let resultMessage = document.getElementById('uploadResultMessage');
+                                if (!resultMessage) {
+                                    resultMessage = document.createElement('div');
+                                    resultMessage.id = 'uploadResultMessage';
+                                    resultMessage.className = 'upload-result-message mt-3 sm:mt-4 p-2 sm:p-4 text-xs sm:text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-800 dark:text-blue-400';
+                                    resultMessage.setAttribute('role', 'alert');
+                                    uploadForm.insertAdjacentElement('afterend', resultMessage);
+                                }
+                                resultMessage.innerHTML = uploadResultContent.innerHTML;
+                                resultMessage.style.display = 'block';
+                            }
+                        } else {
+                            // Xử lý phản hồi JSON
+                            // Cập nhật danh sách tài liệu
+                            updateFilesList(data.files);
+                            
+                            // Hiển thị thông báo kết quả
+                            let resultMessage = document.getElementById('uploadResultMessage');
+                            if (!resultMessage) {
+                                resultMessage = document.createElement('div');
+                                resultMessage.id = 'uploadResultMessage';
+                                resultMessage.className = 'upload-result-message mt-3 sm:mt-4 p-2 sm:p-4 text-xs sm:text-sm text-blue-800 rounded-lg bg-blue-50 dark:bg-gray-800 dark:text-blue-400';
+                                resultMessage.setAttribute('role', 'alert');
+                                uploadForm.insertAdjacentElement('afterend', resultMessage);
+                            }
+                            resultMessage.textContent = data.message;
+                            resultMessage.style.display = 'block';
+                        }
+                        
+                        // Thêm hiệu ứng fade-out sau 5 giây
+                        const resultMessage = document.getElementById('uploadResultMessage');
+                        if (resultMessage) {
+                            setTimeout(function() {
+                                resultMessage.classList.add('fade-out');
+                                setTimeout(function() {
+                                    resultMessage.style.display = 'none';
+                                    resultMessage.classList.remove('fade-out');
+                                }, 500);
+                            }, 5000);
+                        }
+                        
+                        // Reset form
+                        uploadForm.reset();
+                        
+                        // Xóa tên file đã hiển thị
+                        const fileList = document.querySelector('.file-list');
+                        if (fileList) {
+                            fileList.remove();
+                        }
+                        
+                        // Khôi phục nút upload
+                        uploadButton.disabled = false;
+                        uploadButton.innerHTML = 'Tải lên';
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Đã xảy ra lỗi khi tải lên file. Vui lòng thử lại.');
+                        
+                        // Khôi phục nút upload
+                        uploadButton.disabled = false;
+                        uploadButton.innerHTML = 'Tải lên';
+                    });
+                });
             }
         });
+        
+        // Hàm cập nhật danh sách tài liệu từ dữ liệu JSON
+        function updateFilesList(files) {
+            const filesList = document.querySelector('#documents-content .space-y-1');
+            if (!filesList) return;
+            
+            // Xóa nội dung hiện tại
+            filesList.innerHTML = '';
+            
+            // Kiểm tra xem có tài liệu nào không
+            if (!files || Object.keys(files).length === 0) {
+                const noFilesMessage = document.createElement('p');
+                noFilesMessage.className = 'text-xs sm:text-sm text-gray-500 dark:text-gray-400';
+                noFilesMessage.textContent = 'Chưa có tài liệu nào.';
+                filesList.appendChild(noFilesMessage);
+                return;
+            }
+            
+            // Thêm từng tài liệu vào danh sách
+            for (const [filename, info] of Object.entries(files)) {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'flex items-center justify-between p-1.5 sm:p-2 text-sm font-normal text-gray-900 rounded-lg hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700';
+                
+                fileItem.innerHTML = `
+                    <div class="truncate">
+                        <span class="flex-1 text-xs sm:text-sm">${filename}</span>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">${info.chunk_count} chunks, ${info.chunking_method}</p>
+                    </div>
+                    <button type="button" class="delete-file-btn text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400" data-filename="${filename}">
+                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                    </button>
+                `;
+                
+                filesList.appendChild(fileItem);
+            }
+            
+            // Thêm lại sự kiện cho các nút xóa
+            setupDeleteButtons();
+        }
+        
+        // Hàm thiết lập sự kiện cho các nút xóa tài liệu
+        function setupDeleteButtons() {
+            const deleteButtons = document.querySelectorAll('.delete-file-btn');
+            const deleteFileModal = document.getElementById('deleteFileModal');
+            const fileToDeleteSpan = document.getElementById('fileToDelete');
+            const deleteFilenameInput = document.getElementById('deleteFilename');
+            
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Lấy tên file từ thuộc tính data-filename
+                    const filename = this.getAttribute('data-filename');
+                    
+                    // Cập nhật modal với tên file
+                    fileToDeleteSpan.textContent = filename;
+                    deleteFilenameInput.value = filename;
+                    
+                    // Hiển thị modal xác nhận
+                    deleteFileModal.classList.remove('hidden');
+                });
+            });
+        }
     </script>
 </body>
 </html>
