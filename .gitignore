@@ -1,8 +1,17 @@
 # Biến môi trường
 .env
-# Thư mục uploads
+
+# Thư mục uploads và các file dữ liệu
 uploads/*
 !uploads/.gitkeep
+*.pkl
+*.npy
+*.faiss
+*.index
+*.bin
+vectors.*
+tfidf_*.*
+rag_state.json
 
 # Các file cache Python
 __pycache__/
@@ -14,14 +23,9 @@ venv/
 env/
 ENV/
 
-# Các file dữ liệu
-*.pkl
-*.npy
-*.faiss
-*.index
-
 # Logs
 *.log
+performance_metrics.csv
 
 # Các file hệ thống
 .DS_Store
@@ -32,5 +36,17 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo 
-# file khác 
+
+# Các file backup và nén
+app_backup.py
+modules.zip
+*.bak
+*.backup
+*.zip
+
+# Các file tạm thời khác
+*.tmp
+*.temp
+*.out
 performance_metrics.csv
+BLA/

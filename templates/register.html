@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <title>Đăng ký - RAG System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Tailwind CSS và Flowbite -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
+    <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet" />
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+        }
+        .register-container {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100">
+    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="register-container max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg">
+            <div>
+                <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                    Đăng ký tài khoản
+                </h2>
+                <p class="mt-2 text-center text-sm text-gray-600">
+                    Tạo tài khoản mới để sử dụng hệ thống RAG
+                </p>
+            </div>
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="mt-4">
+                {% for category, message in messages %}
+                <div class="p-4 mb-4 {% if category == 'error' %}text-red-800 bg-red-50{% else %}text-green-800 bg-green-50{% endif %} rounded-lg" role="alert">
+                    <span class="font-medium">{{ message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <form id="register-form" class="mt-8 space-y-6" action="{{ url_for('register') }}" method="POST">
+                <div class="rounded-md shadow-sm space-y-4">
+                    <div>
+                        <label for="username" class="sr-only">Tên người dùng</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 start-0 flex items-center ps-3.5 pointer-events-none">
+                                <i class="fa-solid fa-user text-gray-400"></i>
+                            </div>
+                            <input id="username" name="username" type="text" autocomplete="username" required
+                                class="ps-10 block w-full rounded-md border-0 py-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                                placeholder="Tên người dùng" />
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="email" class="sr-only">Email</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 start-0 flex items-center ps-3.5 pointer-events-none">
+                                <i class="fa-solid fa-envelope text-gray-400"></i>
+                            </div>
+                            <input id="email" name="email" type="email" autocomplete="email" required
+                                class="ps-10 block w-full rounded-md border-0 py-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                                placeholder="Email" />
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="password" class="sr-only">Mật khẩu</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 start-0 flex items-center ps-3.5 pointer-events-none">
+                                <i class="fa-solid fa-lock text-gray-400"></i>
+                            </div>
+                            <input id="password" name="password" type="password" autocomplete="new-password" required
+                                class="ps-10 block w-full rounded-md border-0 py-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                                placeholder="Mật khẩu" />
+                            <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-3" data-target="password">
+                                <i class="fa-solid fa-eye text-gray-400"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="confirm_password" class="sr-only">Xác nhận mật khẩu</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 start-0 flex items-center ps-3.5 pointer-events-none">
+                                <i class="fa-solid fa-lock text-gray-400"></i>
+                            </div>
+                            <input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required
+                                class="ps-10 block w-full rounded-md border-0 py-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm"
+                                placeholder="Xác nhận mật khẩu" />
+                            <button type="button" class="password-toggle absolute inset-y-0 right-0 flex items-center pr-3" data-target="confirm_password">
+                                <i class="fa-solid fa-eye text-gray-400"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center">
+                    <input id="terms" name="terms" type="checkbox" required
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                    <label for="terms" class="ml-2 block text-sm text-gray-900">
+                        Tôi đồng ý với <a href="#" class="text-blue-600 hover:text-blue-500">điều khoản sử dụng</a>
+                    </label>
+                </div>
+
+                <div>
+                    <button type="submit"
+                        class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-300">
+                        <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                            <i class="fa-solid fa-user-plus text-blue-400 group-hover:text-blue-300 transition-colors duration-300"></i>
+                        </span>
+                        Đăng ký
+                    </button>
+                </div>
+            </form>
+
+            <div class="text-center mt-4">
+                <p class="text-sm text-gray-600">
+                    Đã có tài khoản?
+                    <a href="{{ url_for('login') }}" class="font-medium text-blue-600 hover:text-blue-500">
+                        Đăng nhập ngay
+                    </a>
+                </p>
+            </div>
+            
+            <div class="text-center mt-6">
+                <a href="{{ url_for('index') }}" class="inline-flex items-center text-sm text-blue-600 hover:text-blue-500">
+                    <i class="fa-solid fa-arrow-left mr-2"></i> Quay lại trang chủ
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+</body>
+
+</html> 

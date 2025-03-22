@@ -19,7 +19,6 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
  │                 │     │                 │     │                 │
  │  Gemini API     │◀───▶│  RAG Engine     │◀───▶│  Vector Store   │
  │                 │     │                 │     │                 │
- └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
 ### 2. Quy trình xử lý tài liệu
@@ -36,7 +35,6 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
                                                             │             │
                                                             │ Vector Store│
                                                             │             │
-                                                            └─────────────┘
 ```
 
 ### 3. Quy trình trả lời câu hỏi
@@ -70,7 +68,7 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 
 3. **Chunking**:
    - Chia văn bản thành các đoạn nhỏ
-   - Các phương pháp: Sentence Windows, Paragraph, Semantic, Token, Adaptive, Hierarchical, Contextual, Multi-granularity, Hybrid
+   - Các phương pháp: Sentence Windows, Paragraph, Semantic, Token, Adaptive, Hierarchical, Contextual, Multi-granularity, Hybrid (Mặc định)
 
 4. **Embedding**:
    - Chuyển đổi các đoạn văn bản thành vector
@@ -79,6 +77,7 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 5. **Vector Store**:
    - Lưu trữ và đánh chỉ mục các vector
    - Sử dụng FAISS để tìm kiếm hiệu quả
+   - Tùy chọn sao lưu dữ liệu lên Supabase
 
 #### 4.2. Trả lời câu hỏi
 
@@ -121,14 +120,36 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
    - Cho phép người dùng chọn phương pháp chunking
    - Tùy chỉnh tham số qua API: `/settings`
 
+5. **Tích hợp Supabase**:
+   - Lưu trữ và quản lý dữ liệu
+   - Xác thực và phân quyền người dùng (đang phát triển)
+
+6. **Xử lý nhiều câu hỏi**:
+   - Phát hiện và xử lý câu hỏi phức hợp
+   - Hàm: `split_multiple_questions()`
+
+7. **Gợi ý câu hỏi**:
+   - Tạo các câu hỏi liên quan đến tài liệu
+   - Hàm: `generate_similar_questions()`
+
 ## Cấu trúc dự án
 ```
 BE/
-├── app.py                # File chính của ứng dụng
-├── .env                  # File chứa các biến môi trường và API keys
-├── README.md             # Tài liệu hướng dẫn
-├── templates/            # Thư mục chứa các template HTML
-└── uploads/              # Thư mục lưu trữ các file được tải lên
+├── app.py                     # File chính của ứng dụng
+├── .env                       # File chứa các biến môi trường và API keys
+├── .env.example               # Mẫu cho file .env
+├── requirements.txt           # Danh sách các thư viện cần thiết
+├── README.md                  # Tài liệu hướng dẫn
+├── performance_metrics.csv    # Dữ liệu đánh giá hiệu suất
+├── templates/                 # Thư mục chứa các template HTML
+│   └── index.html             # Giao diện web
+├── uploads/                   # Thư mục lưu trữ các file được tải lên
+│   ├── .gitkeep               # File để giữ thư mục uploads trên git
+│   ├── rag_state.json         # Trạng thái của hệ thống RAG
+│   ├── faiss_index.bin        # Index vector FAISS
+│   ├── vectors.pkl            # Vector embedding được lưu trữ
+│   ├── tfidf_vectorizer.pkl   # Mô hình TF-IDF vectorizer
+│   └── tfidf_matrix.pkl       # Ma trận TF-IDF
 ```
 
 ## Cài đặt
@@ -141,7 +162,7 @@ BE/
 1. Clone repository:
 ```bash
 git clone <repository-url>
-cd ChatBot_RAG/BE
+cd tttn-document-rag/
 ```
 
 2. Tạo và kích hoạt môi trường ảo:
@@ -162,6 +183,7 @@ pip install -r requirements.txt
 
 4. Cấu hình file `.env`:
    - Tạo file `.env` trong thư mục BE (nếu chưa có)
+   - Tham khảo file `.env.example` để cấu hình
    - Thêm các API key và cấu hình cần thiết:
 ```
 # Gemini API Keys (danh sách các key, phân tách bằng dấu phẩy)
@@ -283,6 +305,12 @@ docker run -p 5000:5000 --env-file .env rag-chatbot
 - **Method**: POST
 - **Body** (form-data): Các tham số cấu hình chunking
 
+#### 8. Xem Embeddings
+- **URL**: `/api/embeddings`
+- **Method**: GET
+- **Query Parameters**:
+  - `limit`: (tùy chọn) Số lượng embeddings hiển thị
+
 ## Phương pháp Chunking
 Hệ thống hỗ trợ nhiều phương pháp chunking khác nhau:
 
@@ -300,11 +328,13 @@ Hệ thống hỗ trợ nhiều phương pháp chunking khác nhau:
 - Điều chỉnh các tham số chunking trong phần cài đặt
 - Sử dụng phương pháp chunking phù hợp với loại tài liệu
 - Điều chỉnh giá trị top_k và threshold khi truy vấn
+- Sử dụng các phương pháp tối ưu hóa cho tiếng Việt
 
 ## Xử lý lỗi
 - Kiểm tra định dạng file upload
 - Đảm bảo API keys hợp lệ trong file .env
 - Kiểm tra logs để phát hiện và khắc phục lỗi
+- Sử dụng cơ chế chuyển đổi API key khi gặp lỗi quota
 
 ## Đóng góp
 Vui lòng gửi pull request hoặc mở issue để đóng góp vào dự án.
