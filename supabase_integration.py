@@ -15,6 +15,96 @@ import json
 # Thiết lập logging
 logger = logging.getLogger('RAG_System')
 
+@require_auth
+def api_update_profile():
+    """
+    API cập nhật thông tin cá nhân của người dùng
+    """
+    user = get_current_user()
+    if not user:
+        return jsonify({"success": False, "message": "Chưa đăng nhập"}), 401
+    
+    try:
+        # Lấy dữ liệu từ request
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "message": "Không có dữ liệu cần cập nhật"
+            }), 400
+        
+        # Cập nhật thông tin người dùng
+        success, message, updated_user = update_user_profile(user['id'], data)
+        
+        if success and updated_user:
+            # Cập nhật session nếu cần
+            if 'email' in data and data['email'] != user['email']:
+                session['email'] = data['email']
+            
+            return jsonify({
+                "success": True,
+                "message": message,
+                "user": {
+                    "id": updated_user.id,
+                    "email": updated_user.email,
+                    "full_name": updated_user.user_metadata.get('full_name') if updated_user.user_metadata else None
+                }
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": message
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Lỗi khi cập nhật thông tin cá nhân: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"Có lỗi xảy ra: {str(e)}"
+        }), 500
+
+@require_auth
+def api_change_password():
+    """
+    API đổi mật khẩu người dùng
+    """
+    user = get_current_user()
+    if not user:
+        return jsonify({"success": False, "message": "Chưa đăng nhập"}), 401
+        
+    try:
+        # Lấy dữ liệu từ request
+        data = request.get_json()
+        current_password = data.get('current_password')
+        new_password = data.get('new_password')
+        
+        if not current_password or not new_password:
+            return jsonify({
+                "success": False,
+                "message": "Thiếu thông tin mật khẩu"
+            }), 400
+            
+        # Đổi mật khẩu
+        success, message = change_password(user['id'], current_password, new_password)
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": message
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": message
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Lỗi khi đổi mật khẩu: {str(e)}")
+        return jsonify({
+            "success": False,
+            "message": f"Có lỗi xảy ra: {str(e)}"
+        }), 500
+
 # Setup routes cho API Chat
 def setup_chat_routes(app):
     """

@@ -49,4 +49,4 @@ modules.zip
 *.temp
 *.out
 performance_metrics.csv
-BLA/
+BLA/*

@@ -232,23 +232,32 @@ def change_password(user_id, current_password, new_password):
             
             if not response.user:
                 return False, "Mật khẩu hiện tại không đúng"
-        except Exception:
+        except Exception as e:
+            logger.error(f"Lỗi khi xác thực mật khẩu hiện tại: {str(e)}")
             return False, "Mật khẩu hiện tại không đúng"
         
-        # Cập nhật mật khẩu
-        supabase.auth.update_user({
-            "password": new_password
-        })
-        
-        logger.info(f"Đã đổi mật khẩu thành công cho user ID: {user_id}")
-        return True, "Đổi mật khẩu thành công!"
+        # Cập nhật mật khẩu - đảm bảo người dùng đã đăng nhập trước khi gọi update_user
+        try:
+            response = supabase.auth.update_user({
+                "password": new_password
+            })
+            
+            if not response or not response.user:
+                return False, "Không thể cập nhật mật khẩu, vui lòng thử lại sau"
+            
+            logger.info(f"Đã đổi mật khẩu thành công cho user ID: {user_id}")
+            return True, "Đổi mật khẩu thành công!"
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Lỗi khi cập nhật mật khẩu mới: {error_msg}")
+            
+            if "Password should be at least" in error_msg:
+                return False, "Mật khẩu mới phải có ít nhất 6 ký tự"
+            
+            return False, f"Lỗi đổi mật khẩu: {error_msg}"
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"Lỗi khi đổi mật khẩu cho user ID {user_id}: {error_msg}")
-        
-        if "Password should be at least" in error_msg:
-            return False, "Mật khẩu mới phải có ít nhất 6 ký tự"
-        
+        logger.error(f"Lỗi chung khi đổi mật khẩu cho user ID {user_id}: {error_msg}")
         return False, f"Lỗi đổi mật khẩu: {error_msg}"
 
 def reset_password_request(email):

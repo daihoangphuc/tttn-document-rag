@@ -3587,13 +3587,13 @@
                     isLoading = true;  // Đánh dấu đang trong quá trình tải
                     
                     // Kiểm tra trạng thái đăng nhập và tải lịch sử chat
-                    fetch('/api/auth/check', {
-                        method: 'GET',
-                        credentials: 'same-origin'
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.logged_in) {
+                        fetch('/api/auth/check', {
+                            method: 'GET',
+                            credentials: 'same-origin'
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.logged_in) {
                             console.log('Người dùng đã đăng nhập, tải lịch sử chat từ server...');
                             loadChatHistoryFromServer();
                         } else {
@@ -3602,13 +3602,13 @@
                             if (chatHistoryList) {
                                 chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Vui lòng đăng nhập để xem lịch sử chat.</p>';
                             }
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
                         if (chatHistoryList) {
                             chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-red-500 dark:text-red-400">Không thể kết nối đến máy chủ. Vui lòng thử lại sau.</p>';
-                        }
+                    }
                     })
                     .finally(() => {
                         isLoading = false;  // Đánh dấu đã hoàn thành quá trình tải
@@ -3624,8 +3624,8 @@
                 });
             }
 
-            // Thiết lập ban đầu - chỉ tải lịch sử chat từ server, không gọi updateChatHistoryUI() trực tiếp
-            loadChatHistoryFromServer();
+            // Thay đổi: Xóa việc gọi loadChatHistoryFromServer ở đây để tránh gọi trùng lặp
+            // loadChatHistoryFromServer();
 
             // Kiểm tra trạng thái đăng nhập và tạo chat mới nếu cần
             fetch('/api/auth/check', {
@@ -3847,9 +3847,14 @@
                         window.location.href = '/logout';
                 });
             }
-
+            
             // Kiểm tra trạng thái đăng nhập và hiển thị phù hợp
             checkLoginStatus();
+        });
+
+        //Khi nút logout được click, xóa toàn bộ localStorage
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            localStorage.clear();
         });
 
         // Kiểm tra trạng thái đăng nhập
@@ -3879,28 +3884,12 @@
                     loggedInElements.forEach(el => el.classList.remove('hidden'));
                     
                     // Cập nhật thông tin người dùng trong dropdown
-                    if (userName && data.user) {
-                        // Ưu tiên dùng fullname, nếu không có thì dùng username, nếu không thì dùng giá trị mặc định
-                        userName.textContent = data.user.full_name || data.user.fullname || data.user.username || 'Người dùng';
-                        userEmail.textContent = data.user.email || '';
-                    }
-                    
-                    // Cập nhật thông tin trong modal profile
-                    if (profileName && data.user) {
-                        profileName.textContent = data.user.full_name || data.user.fullname || data.user.username || 'Người dùng';
-                        profileEmail.textContent = data.user.email || '';
-                        
-                        // Cập nhật giá trị vào form
-                        const fullnameInput = document.getElementById('fullname');
-                        const emailInput = document.getElementById('email');
-                        
-                        if (fullnameInput) {
-                            fullnameInput.value = data.user.full_name || data.user.fullname || data.user.username || '';
-                        }
-                        
-                        if (emailInput) {
-                            emailInput.value = data.user.email || '';
-                        }
+                    if (userName) {
+                        // Lấy tên từ email (phần trước @)
+                        const email = data.email || '';
+                        const userNameValue = email.split('@')[0];
+                        userName.textContent = userNameValue;
+                        userEmail.textContent = email;
                     }
                 } else {
                     // Người dùng chưa đăng nhập
@@ -3964,37 +3953,9 @@
                         </div>
                     </div>
                     
-                    <!-- Tabs -->
-                    <div class="mb-4 border-b border-gray-200 dark:border-gray-700">
-                        <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="profile-tabs" role="tablist">
-                            <li class="mr-2" role="presentation">
-                                <button class="inline-block p-4 border-b-2 rounded-t-lg active" id="personal-info-tab" data-tabs-target="#personal-info" type="button" role="tab" aria-controls="personal-info" aria-selected="true">Thông tin cá nhân</button>
-                            </li>
-                            <li class="mr-2" role="presentation">
-                                <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300" id="change-password-tab" data-tabs-target="#change-password" type="button" role="tab" aria-controls="change-password" aria-selected="false">Đổi mật khẩu</button>
-                            </li>
-                        </ul>
-                    </div>
-                    
-                    <!-- Tab content -->
-                    <div id="profile-tab-content">
-                        <!-- Thông tin cá nhân -->
-                        <div class="block" id="personal-info" role="tabpanel" aria-labelledby="personal-info-tab">
-                            <form id="personal-info-form" class="space-y-4 sm:space-y-6">
-                                <div>
-                                    <label for="fullname" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Họ và tên</label>
-                                    <input type="text" name="fullname" id="fullname" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Nhập họ và tên">
-                                </div>
-                                <div>
-                                    <label for="email" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Email</label>
-                                    <input type="email" name="email" id="email" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="name@example.com" readonly>
-                                </div>
-                                <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Cập nhật thông tin</button>
-                            </form>
-                        </div>
-                        
-                        <!-- Đổi mật khẩu -->
-                        <div class="hidden" id="change-password" role="tabpanel" aria-labelledby="change-password-tab">
+                    <!-- Xóa phần tabs và chỉ giữ lại phần đổi mật khẩu -->
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-medium text-gray-900 dark:text-white">Đổi mật khẩu</h4>
                             <form id="change-password-form" class="space-y-4 sm:space-y-6">
                                 <div>
                                     <label for="current-password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Mật khẩu hiện tại</label>
@@ -4010,7 +3971,6 @@
                                 </div>
                                 <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Cập nhật mật khẩu</button>
                             </form>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -4020,86 +3980,29 @@
     <!-- JavaScript để xử lý tương tác với modal hồ sơ cá nhân -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Tab profile
-            const profileTabs = document.querySelectorAll('#profile-tabs [role="tab"]');
-            const profileTabContents = document.querySelectorAll('#profile-tab-content [role="tabpanel"]');
-            
-            profileTabs.forEach(tab => {
-                tab.addEventListener('click', function() {
-                    // Bỏ active từ tất cả tabs
-                    profileTabs.forEach(t => {
-                        t.classList.remove('active', 'border-blue-600', 'text-blue-600');
-                        t.classList.add('border-transparent');
-                        t.setAttribute('aria-selected', 'false');
-                    });
-                    
-                    // Thêm active cho tab được chọn
-                    this.classList.add('active', 'border-blue-600', 'text-blue-600');
-                    this.classList.remove('border-transparent');
-                    this.setAttribute('aria-selected', 'true');
-                    
-                    // Ẩn tất cả nội dung tab
-                    profileTabContents.forEach(content => {
-                        content.classList.add('hidden');
-                        content.classList.remove('block');
-                    });
-                    
-                    // Hiển thị nội dung tab được chọn
-                    const target = document.querySelector(this.getAttribute('data-tabs-target'));
-                    if (target) {
-                        target.classList.remove('hidden');
-                        target.classList.add('block');
-                    }
-                });
-            });
-            
             // Điền thông tin hồ sơ khi mở modal
             document.getElementById('profile-modal-btn').addEventListener('click', function() {
-                // Lấy thông tin người dùng từ dropdown
-                const userName = document.getElementById('user-name').textContent;
-                const userEmail = document.getElementById('user-email').textContent;
-                
-                // Điền thông tin vào form
-                document.getElementById('profile-name').textContent = userName;
-                document.getElementById('profile-email').textContent = userEmail;
-                document.getElementById('fullname').value = userName;
-                document.getElementById('email').value = userEmail;
-            });
-            
-            // Xử lý form cập nhật thông tin cá nhân
-            document.getElementById('personal-info-form').addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                // Lấy thông tin từ form
-                const fullname = document.getElementById('fullname').value;
-                
-                // Gửi yêu cầu cập nhật
-                fetch('/api/user/profile', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        fullname: fullname
-                    }),
+                // Lấy thông tin người dùng từ API
+                fetch('/api/auth/check', {
+                    method: 'GET',
                     credentials: 'same-origin'
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success) {
-                        // Cập nhật thông tin hiển thị
-                        document.getElementById('user-name').textContent = fullname;
-                        document.getElementById('profile-name').textContent = fullname;
+                    if (data.logged_in) {
+                        const email = data.email || '';
+                        // Lấy phần trước @ trong email để làm tên người dùng
+                        const userName = email.split('@')[0];
                         
-                        // Hiển thị thông báo thành công
-                        showNotification('Cập nhật thành công', 'Thông tin cá nhân đã được cập nhật.', 'success');
+                        // Điền thông tin vào modal
+                        document.getElementById('profile-name').textContent = userName;
+                        document.getElementById('profile-email').textContent = email;
                     } else {
-                        showNotification('Lỗi cập nhật', data.message || 'Không thể cập nhật thông tin cá nhân.', 'error');
+                        console.error('Không thể lấy thông tin người dùng: Chưa đăng nhập');
                     }
                 })
                 .catch(error => {
-                    console.error('Lỗi khi cập nhật thông tin:', error);
-                    showNotification('Lỗi kết nối', 'Không thể kết nối đến máy chủ.', 'error');
+                    console.error('Lỗi khi lấy thông tin người dùng:', error);
                 });
             });
             
@@ -4117,6 +4020,20 @@
                     showNotification('Lỗi', 'Mật khẩu mới và xác nhận mật khẩu không khớp.', 'error');
                     return;
                 }
+                
+                // Lấy nút submit và disable nó
+                const submitButton = this.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                
+                // Thay đổi văn bản của nút thành trạng thái loading
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Đang cập nhật...
+                `;
                 
                 // Gửi yêu cầu đổi mật khẩu
                 fetch('/api/user/change-password', {
@@ -4137,17 +4054,19 @@
                         document.getElementById('change-password-form').reset();
                         
                         // Hiển thị thông báo thành công
-                        showNotification('Đổi mật khẩu thành công', 'Mật khẩu của bạn đã được cập nhật.', 'success');
-                        
-                        // Chuyển về tab thông tin cá nhân
-                        document.getElementById('personal-info-tab').click();
+                        showNotification('Cập nhật thành công', 'Mật khẩu đã được cập nhật.', 'success');
                     } else {
-                        showNotification('Lỗi đổi mật khẩu', data.message || 'Không thể đổi mật khẩu.', 'error');
+                        showNotification('Lỗi cập nhật', data.message || 'Không thể cập nhật mật khẩu.', 'error');
                     }
                 })
                 .catch(error => {
-                    console.error('Lỗi khi đổi mật khẩu:', error);
+                    console.error('Lỗi khi cập nhật mật khẩu:', error);
                     showNotification('Lỗi kết nối', 'Không thể kết nối đến máy chủ.', 'error');
+                })
+                .finally(() => {
+                    // Khôi phục nút submit về trạng thái ban đầu
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
                 });
             });
         });
@@ -4194,6 +4113,39 @@
             });
             
             console.log('Đã khởi tạo tất cả các thành phần UI');
+        });
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Xử lý flash messages nếu có
+            const flashMessages = document.querySelectorAll('.flash-message');
+            if (flashMessages.length > 0) {
+                // Thêm hiệu ứng mờ dần sau vài giây
+                flashMessages.forEach(message => {
+                    // Tự động ẩn sau 5 giây
+                    setTimeout(function() {
+                        message.classList.add('opacity-0');
+                        
+                        // Xóa phần tử khỏi DOM sau khi đã mờ đi
+                        setTimeout(function() {
+                            message.remove();
+                        }, 500);
+                    }, 5000);
+                });
+
+                // Gửi request để xóa flash messages khỏi session
+                if (flashMessages.length > 0) {
+                    fetch('/clear-flash-messages', {
+                        method: 'POST',
+                        credentials: 'same-origin'
+                    }).catch(error => {
+                        console.error('Lỗi khi xóa flash messages:', error);
+                    });
+                }
+            }
+
+            // Khởi tạo khi trang đã tải xong
+            // ... existing code ...
         });
     </script>
 </body>

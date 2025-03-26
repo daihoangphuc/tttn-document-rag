@@ -4626,8 +4626,12 @@ from supabase_modules.auth import setup_auth_routes as setup_auth_routes_status
 setup_auth_routes_status(app)
 
 # Thiết lập các route API cho chat history và tương tác với Supabase
-from supabase_integration import setup_chat_routes
+from supabase_integration import setup_chat_routes, api_update_profile, api_change_password
 setup_chat_routes(app)
+
+# Đăng ký các route API liên quan đến profile và đổi mật khẩu từ supabase_integration
+app.add_url_rule('/api/user/profile', view_func=api_update_profile, methods=['POST'])
+app.add_url_rule('/api/user/change-password', view_func=api_change_password, methods=['POST'])
 
 # Thêm route riêng để kiểm tra kết nối Supabase
 @app.route('/api/supabase-check', methods=['GET'])
