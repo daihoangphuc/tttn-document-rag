@@ -1,6 +1,6 @@
 # Cài đặt các gói cần thiết
 # Chạy lệnh sau trong cell riêng:
-#!pip install flask pyngrok google-generativeai transformers sentence-transformers PyPDF2 python-docx nltk faiss-cpu scikit-learn pandas matplotlib tqdm underthesea pyvi rank_bm25 supabase python-dotenv flask-session
+#!pip install flask pyngrok google-generativeai transformers sentence-transformers PyPDF2 python-docx nltk faiss-cpu scikit-learn pandas matplotlib tqdm underthesea pyvi rank_bm25
 
 # Thông báo: Dự án này đã được cải tiến với các tính năng tối ưu hóa quá trình truy xuất (retrieval) cho tiếng Việt:
 # 1. Query transformation: Sử dụng các kỹ thuật biến đổi truy vấn để tăng tính liên quan giữa truy vấn và tài liệu
@@ -8,7 +8,7 @@
 # Các thư viện NLP tiếng Việt (underthesea, pyvi, rank_bm25) được sử dụng để tối ưu hóa cho tiếng Việt
 
 # Import Flask và các thư viện cần thiết
-from flask import Flask, request, render_template_string, redirect, url_for, jsonify, flash, session, render_template
+from flask import Flask, request, render_template_string, redirect, url_for, jsonify
 import google.generativeai as genai  # Sửa lại cách import
 from pyngrok import ngrok
 import time  # Thêm import time để xử lý delay giữa các lần thử
@@ -26,8 +26,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import faiss
 from sentence_transformers import SentenceTransformer, util
 from dotenv import load_dotenv  # Thêm import này để sử dụng load_dotenv
-from werkzeug.utils import secure_filename
-from functools import wraps
 # Thư viện NLP cho tiếng Việt
 try:
     from underthesea import word_tokenize, text_normalize
@@ -38,33 +36,15 @@ except ImportError:
     VIETNAMESE_NLP_AVAILABLE = False
     print("Thư viện NLP tiếng Việt không khả dụng. Một số tính năng có thể bị hạn chế.")
 
-# Import các module Supabase
-from supabase_modules.config import init_app as init_supabase, get_supabase_client
-from supabase_modules.auth import register_user, login_user, logout_user, get_current_user, verify_session, require_auth, change_password, reset_password_request, setup_auth_routes
-from supabase_modules.chat_history import create_chat, get_chats, get_chat, update_chat_title, delete_chat, add_message, get_messages, migrate_chat_history
-from supabase_modules.file_manager import ensure_user_upload_dir, save_user_file, get_user_files, delete_user_file, migrate_files_to_user_directory, get_file_path
-from supabase_modules.helpers import get_user_id_from_session, migrate_localStorage_to_supabase, initialize_user_data, format_chat_history_for_frontend, get_user_files_with_metadata
-# Import module supabase_integration
-import supabase_integration
-from supabase_integration import setup_auth_routes, enhanced_upload_file, enhanced_remove_file, get_enhanced_index_html
-
 # Thiết lập logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('RAG_System')
+logger = logging.getLogger('rag_system')
 
 # Khởi tạo Flask app
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "your_secret_key_here")
 
 # Tải biến môi trường từ file .env
 load_dotenv()
-
-# Đường dẫn thư mục upload
-upload_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
-os.makedirs(upload_folder, exist_ok=True)
-
-# Khởi tạo Supabase
-init_supabase(app)
 
 # Lấy danh sách API keys từ biến môi trường và tách thành list
 API_KEYS = os.getenv("GEMINI_API_KEYS", "").split(",")
@@ -113,101 +93,61 @@ gemini_config = {
     "temperature": 0.2,  # Độ sáng tạo (thấp hơn = ít sáng tạo hơn, nhất quán hơn)
     "top_p": 0.95,       # Lọc xác suất tích lũy (nucleus sampling)
     "top_k": 40,         # Số lượng token có xác suất cao nhất để xem xét
-    "max_output_tokens": 4096  # Độ dài tối đa của câu trả lời
+    "max_output_tokens": 4096,  # Độ dài tối đa của câu trả lời
+    "response_mime_type": "text/plain"  # Định dạng phản hồi
 }
 
 def generate_with_retry(prompt, config, max_retries=MAX_RETRIES):
     """
-    Gọi Gemini API với cơ chế retry và chuyển đổi API key
+    Thử gọi API Gemini với cơ chế retry và chuyển đổi API key khi cần
     
-    Hàm này gọi Gemini API và tự động thử lại với API key khác nếu gặp lỗi.
-    Điều này giúp xử lý các trường hợp hết quota hoặc lỗi tạm thời.
+    Hàm này sẽ thử gọi API Gemini và tự động chuyển sang API key khác
+    nếu gặp lỗi về quota hoặc resource exhausted. Nó sẽ thử lại tối đa
+    số lần bằng số lượng API key có sẵn.
     
     Args:
-        prompt (str): Prompt gửi đến Gemini
-        config (dict): Cấu hình cho request
+        prompt (str): Nội dung prompt gửi đến Gemini
+        config (dict): Cấu hình cho việc sinh nội dung
         max_retries (int): Số lần thử tối đa
         
     Returns:
-        str: Phản hồi từ Gemini hoặc thông báo lỗi
+        str: Nội dung phản hồi từ Gemini
+        
+    Raises:
+        Exception: Nếu không thể tạo câu trả lời sau khi thử tất cả API keys
     """
     global gemini_model
     
-    # Đảm bảo không có trường response_mime_type trong config
-    if "response_mime_type" in config:
-        config_copy = config.copy()
-        config_copy.pop("response_mime_type", None)
-    else:
-        config_copy = config
-    
-    retries = 0
-    while retries < max_retries:
+    for attempt in range(max_retries):
         try:
             if gemini_model is None:
                 gemini_model = initialize_gemini()
                 if gemini_model is None:
                     raise Exception("Không thể khởi tạo model Gemini")
             
-            # Gọi Gemini API
-            response = gemini_model.generate_content(prompt, generation_config=config_copy)
+            # Gọi API Gemini để sinh câu trả lời
+            response = gemini_model.generate_content(
+                contents=prompt,
+                generation_config=config
+            )
             
             # Trả về text từ response
             return response.text
-        
+            
         except Exception as e:
             error_message = str(e)
-            logger.error(f"Lỗi khi gọi Gemini API (lần thử {retries+1}/{max_retries}): {error_message}")
+            logger.error(f"Lần thử {attempt + 1}/{max_retries}: Lỗi khi gọi Gemini API: {error_message}")
             
-            # Nếu lỗi liên quan đến quota hoặc API key
-            if "quota" in error_message.lower() or "api key" in error_message.lower() or "rate limit" in error_message.lower():
-                logger.info(f"Chuyển sang API key tiếp theo...")
+            if "Resource has been exhausted" in error_message or "quota" in error_message.lower():
+                logger.info(f"Chuyển sang API key tiếp theo (lần thử {attempt + 1})")
                 gemini_model = switch_api_key()
-            
-            # Tăng số lần thử và đợi một chút trước khi thử lại
-            retries += 1
-            time.sleep(1)  # Đợi 1 giây trước khi thử lại
+                time.sleep(1)  # Đợi 1 giây trước khi thử lại
+                continue
+                
+            if attempt == max_retries - 1:
+                raise Exception(f"Đã thử {max_retries} lần nhưng không thành công: {error_message}")
     
-    # Nếu đã thử hết số lần mà vẫn lỗi
-    return "Xin lỗi, tôi không thể xử lý yêu cầu của bạn lúc này. Vui lòng thử lại sau."
-
-def fix_vietnamese_spacing(text):
-    """
-    Sửa lỗi tách từ tiếng Việt bằng cách gọi Gemini
-    
-    Args:
-        text (str): Văn bản cần sửa lỗi tách từ
-        
-    Returns:
-        str: Văn bản đã được sửa lỗi tách từ
-    """
-    try:
-        # Tạo prompt để sửa lỗi tách từ
-        prompt = f"""Hãy sửa lỗi tách từ trong câu sau để đảm bảo câu giữ nguyên nội dung và ý nghĩa, nhưng các từ được tách đúng cách:
-
-    {text}
-    
-    LƯU Ý QUAN TRỌNG:
-    1. Không thêm bất kỳ giải thích, phân tích hay nhận xét nào
-    2. Không đề cập đến việc phân tích lĩnh vực hay chuyên môn
-    3. Không có lời mở đầu hay kết luận
-    4. QUAN TRỌNG NHẤT: Giữ nguyên cấu trúc gốc của nó
-    5. Đảm bảo các từ tiếng Việt được viết liền mạch, không bị tách ra thành các âm tiết riêng biệt với dấu cách ở giữa
-    6. Giữ nguyên định dạng liệt kê như a), b), c) hoặc (a), (b), (c) trong văn bản gốc
-    7. Giữ nguyên các dấu xuống dòng và khoảng cách giữa các đoạn văn"""
-            
-        # Sử dụng hàm generate_with_retry đã có với temperature thấp để đảm bảo độ chính xác
-        fixed_text = generate_with_retry(prompt, {
-                "temperature": 0.1,
-                "top_p": 0.95,
-                "top_k": 40,
-                "max_output_tokens": 4096,
-            })
-            
-        return fixed_text
-    except Exception as e:
-        logger.error(f"Lỗi khi sửa lỗi tách từ tiếng Việt: {str(e)}")
-        # Trả về văn bản gốc nếu có lỗi
-        return text
+    raise Exception("Không thể tạo câu trả lời sau khi thử tất cả API keys")
 
 # HTML template cho trang web
 index_html = open('templates/index.html', 'r', encoding='utf-8').read()
@@ -300,58 +240,21 @@ def extract_text_docx(file_path):
     Trích xuất văn bản từ file DOCX (Microsoft Word)
     
     Hàm này đọc nội dung từ file DOCX và chuyển đổi thành văn bản thuần túy.
-    Đã cải tiến để đánh dấu thông tin về trang chính xác hơn.
     
     Args:
         file_path (str): Đường dẫn đến file DOCX
         
     Returns:
-        str: Văn bản trích xuất từ file DOCX
+        str: Nội dung văn bản đã trích xuất
     """
     try:
-        import docx
         doc = docx.Document(file_path)
+        text = "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
         
-        full_text = []
-        page_count = 1
-        paragraph_count = 0
-        char_count = 0
-        
-        # Phân tích số lượng ký tự trung bình mỗi trang cho DOCX
-        # Thông thường một trang A4 với font 12pt có khoảng 2000-3000 ký tự
-        estimated_page_size = 2500  # Số ký tự trung bình trên một trang DOCX chuẩn
-        
-        # Thêm đánh dấu trang đầu tiên
-        full_text.append(f"[Trang {page_count}]")
-        
-        # Phân tích tất cả các đoạn văn
-        paragraphs_text = []
-        for para in doc.paragraphs:
-            text = para.text.strip()
-            if text:
-                paragraphs_text.append(text)
-                char_count += len(text)
-        
-        # Ước tính tổng số trang dựa trên tổng số ký tự
-        total_pages = max(1, int(char_count / estimated_page_size) + 1)
-        
-        # Phân bổ đánh dấu trang dựa trên số lượng đoạn và tổng số trang
-        if len(paragraphs_text) > 0:
-            # Nếu có ít nhất 1 đoạn văn bản
-            paragraphs_per_page = max(1, len(paragraphs_text) // total_pages)
-            
-            # Thêm các đoạn văn vào văn bản với đánh dấu trang
-            current_page = 1
-            for i, para_text in enumerate(paragraphs_text):
-                # Thêm dấu trang mới nếu cần
-                if i > 0 and i % paragraphs_per_page == 0 and current_page < total_pages:
-                    current_page += 1
-                    full_text.append(f"[Trang {current_page}]")
-                
-                # Thêm đoạn văn
-                full_text.append(para_text)
-        
-        return "\n".join(full_text)
+        # Đảm bảo trả về một chuỗi văn bản
+        if isinstance(text, list):
+            text = "\n".join(text)
+        return text
     except Exception as e:
         logger.error(f"Lỗi khi đọc file DOCX {file_path}: {str(e)}")
         return ""
@@ -364,88 +267,28 @@ def extract_text_txt(file_path):
         file_path (str): Đường dẫn đến file TXT
         
     Returns:
-        str: Nội dung văn bản đã đọc với thông tin trang được thêm vào
+        str: Nội dung văn bản đã đọc
     """
     try:
         with open(file_path, "r", encoding="utf-8") as f:
-            raw_text = f.read()
-        
-        # Thêm thông tin trang cho file TXT
-        lines = raw_text.split('\n')
-        
-        # Lọc bỏ dòng trống
-        non_empty_lines = [line for line in lines if line.strip()]
-        
-        # Phân tích số lượng ký tự
-        char_count = len(raw_text)
-        
-        # Ước tính số trang dựa trên số ký tự
-        # Thông thường một trang A4 với font 12pt có khoảng 2000-3000 ký tự
-        estimated_page_size = 2500
-        total_pages = max(1, int(char_count / estimated_page_size) + 1)
-        
-        # Nếu ít hơn 1 trang, chỉ trả về văn bản ban đầu
-        if total_pages <= 1:
-            return f"[Trang 1]\n{raw_text}"
-        
-        # Khởi tạo kết quả
-        processed_text = []
-        
-        # Phân bổ đánh dấu trang dựa trên số lượng dòng và tổng số trang
-        if len(non_empty_lines) > 0:
-            # Số dòng trên mỗi trang
-            lines_per_page = max(1, len(non_empty_lines) // total_pages)
+            text = f.read()
             
-            # Thêm các dòng vào văn bản với đánh dấu trang
-            current_page = 1
-            processed_text.append(f"[Trang {current_page}]")
-            
-            line_count = 0
-            for line in lines:
-                processed_text.append(line)
-                if line.strip():  # Chỉ đếm các dòng không trống
-                    line_count += 1
-                    
-                    # Thêm đánh dấu trang mới nếu cần
-                    if line_count % lines_per_page == 0 and current_page < total_pages:
-                        current_page += 1
-                        processed_text.append(f"[Trang {current_page}]")
-        
-        return "\n".join(processed_text)
+            # Đảm bảo trả về một chuỗi văn bản
+            if isinstance(text, list):
+                text = "\n".join(text)
+            return text
     except UnicodeDecodeError:
         try:
             # Thử lại với encoding khác
             with open(file_path, "r", encoding="latin-1") as f:
-                raw_text = f.read()
-            
-            # Xử lý tương tự như trên
-            lines = raw_text.split('\n')
-            non_empty_lines = [line for line in lines if line.strip()]
-            char_count = len(raw_text)
-            estimated_page_size = 2500
-            total_pages = max(1, int(char_count / estimated_page_size) + 1)
-            
-            if total_pages <= 1:
-                return f"[Trang 1]\n{raw_text}"
-            
-            processed_text = []
-            if len(non_empty_lines) > 0:
-                lines_per_page = max(1, len(non_empty_lines) // total_pages)
-                current_page = 1
-                processed_text.append(f"[Trang {current_page}]")
+                text = f.read()
                 
-                line_count = 0
-                for line in lines:
-                    processed_text.append(line)
-                    if line.strip():
-                        line_count += 1
-                        if line_count % lines_per_page == 0 and current_page < total_pages:
-                            current_page += 1
-                            processed_text.append(f"[Trang {current_page}]")
-            
-            return "\n".join(processed_text)
+                # Đảm bảo trả về một chuỗi văn bản
+                if isinstance(text, list):
+                    text = "\n".join(text)
+                return text
         except Exception as e:
-            logger.error(f"Lỗi khi đọc file TXT {file_path} với encoding latin-1: {str(e)}")
+            logger.error(f"Lỗi khi đọc file TXT {file_path}: {str(e)}")
             return ""
     except Exception as e:
         logger.error(f"Lỗi khi đọc file TXT {file_path}: {str(e)}")
@@ -1271,7 +1114,7 @@ import pandas as pd
 from collections import Counter
 
 # Cấu hình embedding model - nâng cấp lên mô hình mạnh hơn
-embedder = SentenceTransformer('all-mpnet-base-v2') 
+embedder = SentenceTransformer('all-mpnet-base-v2')  # Nâng cấp từ 'all-MiniLM-L6-v2'
 d = embedder.get_sentence_embedding_dimension()
 
 # Khởi tạo biến toàn cục
@@ -1301,146 +1144,79 @@ default_configs = {
 # Lưu và nạp trạng thái
 def save_state():
     """Lưu trạng thái hiện tại của hệ thống RAG"""
-    # Xác định thư mục lưu trữ dựa trên người dùng đăng nhập
-    from supabase_modules.helpers import get_user_id_from_session
-    from supabase_modules.file_manager import ensure_user_upload_dir
-    from flask import has_request_context
-    
-    # Kiểm tra xem có đang trong ngữ cảnh request không
-    if has_request_context():
-        user_id = get_user_id_from_session()
-        if user_id:
-            # Nếu có người dùng đăng nhập, lưu vào thư mục của họ
-            save_dir = ensure_user_upload_dir(user_id)
-        else:
-            # Nếu không có người dùng đăng nhập, lưu vào thư mục uploads chung
-            save_dir = upload_folder
-    else:
-        # Nếu không trong ngữ cảnh request (ví dụ: khi khởi động), sử dụng thư mục mặc định
-        save_dir = upload_folder
-        logger.info("Khởi động ứng dụng: Lưu dữ liệu vào thư mục mặc định")
-    
     state = {
         'metadata': global_metadata,
         'all_files': global_all_files,
         'date': datetime.now().isoformat()
     }
     # Lưu metadata và danh sách file
-    with open(os.path.join(save_dir, 'rag_state.json'), 'w', encoding='utf-8') as f:
+    with open(os.path.join(upload_folder, 'rag_state.json'), 'w', encoding='utf-8') as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
     
     # Lưu vectors
     if global_vector_list:
         vectors = np.vstack(global_vector_list).astype('float32')
-        with open(os.path.join(save_dir, 'vectors.pkl'), 'wb') as f:
+        with open(os.path.join(upload_folder, 'vectors.pkl'), 'wb') as f:
             pickle.dump(vectors, f)
     
     # Lưu index FAISS nếu đã có
     if faiss_index is not None:
-        faiss.write_index(faiss_index, os.path.join(save_dir, 'faiss_index.bin'))
+        faiss.write_index(faiss_index, os.path.join(upload_folder, 'faiss_index.bin'))
     
     # Lưu TF-IDF vectorizer và matrix
     if tfidf_vectorizer is not None and tfidf_matrix is not None:
-        with open(os.path.join(save_dir, 'tfidf_vectorizer.pkl'), 'wb') as f:
+        with open(os.path.join(upload_folder, 'tfidf_vectorizer.pkl'), 'wb') as f:
             pickle.dump(tfidf_vectorizer, f)
-        with open(os.path.join(save_dir, 'tfidf_matrix.pkl'), 'wb') as f:
+        with open(os.path.join(upload_folder, 'tfidf_matrix.pkl'), 'wb') as f:
             pickle.dump(tfidf_matrix, f)
 
 def load_state():
-    """Nạp trạng thái hệ thống RAG từ file"""
-    global global_metadata, global_all_files, global_vector_list, global_content_dict, global_reranker
-    global faiss_index, tfidf_vectorizer, tfidf_matrix
+    """Nạp trạng thái từ file lưu trữ"""
+    global global_metadata, global_all_files, global_vector_list, faiss_index, tfidf_vectorizer, tfidf_matrix
     
-    # Reset lại tất cả các biến global trước khi nạp dữ liệu mới
-    global_metadata = []
-    global_all_files = {}
-    global_vector_list = []
-    faiss_index = None
-    tfidf_vectorizer = None
-    tfidf_matrix = None
+    metadata_path = os.path.join(upload_folder, 'rag_state.json')
+    vectors_path = os.path.join(upload_folder, 'vectors.pkl')
+    index_path = os.path.join(upload_folder, 'faiss_index.bin')
+    tfidf_vectorizer_path = os.path.join(upload_folder, 'tfidf_vectorizer.pkl')
+    tfidf_matrix_path = os.path.join(upload_folder, 'tfidf_matrix.pkl')
     
-    # Xác định thư mục nạp dựa trên người dùng đăng nhập
-    from supabase_modules.helpers import get_user_id_from_session
-    from supabase_modules.file_manager import ensure_user_upload_dir, get_user_upload_dir
-    from flask import has_request_context
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                state = json.load(f)
+                global_metadata = state['metadata']
+                global_all_files = state.get('all_files', {})
+                logger.info(f"Nạp metadata: {len(global_metadata)} chunks, {len(global_all_files)} files")
+        except Exception as e:
+            logger.error(f"Lỗi khi nạp metadata: {str(e)}")
     
-    # Kiểm tra xem có đang trong ngữ cảnh request không
-    if has_request_context():
-        user_id = get_user_id_from_session()
-        if user_id:
-            # Nếu có người dùng đăng nhập, nạp từ thư mục của họ
-            load_dir = get_user_upload_dir(user_id)
-            if not os.path.exists(load_dir):
-                load_dir = ensure_user_upload_dir(user_id)
-                logger.info(f"Tạo thư mục người dùng mới: {load_dir}")
-                return False
-        else:
-            # Nếu không có người dùng đăng nhập, nạp từ thư mục uploads chung
-            load_dir = upload_folder
-    else:
-        # Nếu không trong ngữ cảnh request (ví dụ: khi khởi động), sử dụng thư mục mặc định
-        load_dir = upload_folder
-        logger.info("Khởi động ứng dụng: Nạp dữ liệu từ thư mục mặc định")
-    
-    # Nạp metadata và danh sách file
-    state_file = os.path.join(load_dir, 'rag_state.json')
-    if not os.path.exists(state_file):
-        logger.info(f"Không tìm thấy file trạng thái tại {state_file}")
-        return False
-    
-    try:
-        with open(state_file, 'r', encoding='utf-8') as f:
-            state = json.load(f)
-        
-        # Đảm bảo kiểu dữ liệu tương thích
-        global_metadata = state.get('metadata', [])
-        if not isinstance(global_metadata, list):
-            global_metadata = []
-            
-        global_all_files = state.get('all_files', {})
-        if not isinstance(global_all_files, dict):
-            global_all_files = {}
-        
-        # Nạp vectors nếu có
-        vectors_file = os.path.join(load_dir, 'vectors.pkl')
-        if os.path.exists(vectors_file):
-            with open(vectors_file, 'rb') as f:
+    if os.path.exists(vectors_path):
+        try:
+            with open(vectors_path, 'rb') as f:
                 vectors = pickle.load(f)
-            global_vector_list = [vectors]
-            
-            # Nạp index FAISS nếu có
-            faiss_index_file = os.path.join(load_dir, 'faiss_index.bin')
-            if os.path.exists(faiss_index_file):
-                faiss_index = faiss.read_index(faiss_index_file)
-            else:
-                # Tạo index mới nếu không tìm thấy file
-                initialize_faiss_index()
-                
-            # Nạp TF-IDF vectorizer và matrix nếu có
-            tfidf_vectorizer_file = os.path.join(load_dir, 'tfidf_vectorizer.pkl')
-            tfidf_matrix_file = os.path.join(load_dir, 'tfidf_matrix.pkl')
-            
-            if os.path.exists(tfidf_vectorizer_file) and os.path.exists(tfidf_matrix_file):
-                with open(tfidf_vectorizer_file, 'rb') as f:
-                    tfidf_vectorizer = pickle.load(f)
-                with open(tfidf_matrix_file, 'rb') as f:
-                    tfidf_matrix = pickle.load(f)
-            else:
-                # Tạo TF-IDF mới nếu không tìm thấy file
-                initialize_tfidf()
-        
-        logger.info(f"Đã nạp dữ liệu từ {load_dir}: {len(global_metadata)} chunks, {len(global_all_files)} file")
-        return True
-    except Exception as e:
-        logger.error(f"Lỗi khi nạp dữ liệu từ {load_dir}: {str(e)}")
-        # Reset lại tất cả các biến global nếu có lỗi
-        global_metadata = []
-        global_all_files = {}
-        global_vector_list = []
-        faiss_index = None
-        tfidf_vectorizer = None
-        tfidf_matrix = None
-        return False
+                # Tạo lại danh sách vector từ matrix
+                global_vector_list = [vectors[i] for i in range(vectors.shape[0])]
+                logger.info(f"Nạp vectors: {len(global_vector_list)} vectors")
+        except Exception as e:
+            logger.error(f"Lỗi khi nạp vectors: {str(e)}")
+    
+    if os.path.exists(index_path):
+        try:
+            faiss_index = faiss.read_index(index_path)
+            logger.info(f"Nạp FAISS index: {faiss_index.ntotal} vectors")
+        except Exception as e:
+            logger.error(f"Lỗi khi nạp FAISS index: {str(e)}")
+
+    # Nạp TF-IDF vectorizer và matrix
+    if os.path.exists(tfidf_vectorizer_path) and os.path.exists(tfidf_matrix_path):
+        try:
+            with open(tfidf_vectorizer_path, 'rb') as f:
+                tfidf_vectorizer = pickle.load(f)
+            with open(tfidf_matrix_path, 'rb') as f:
+                tfidf_matrix = pickle.load(f)
+            logger.info(f"Nạp TF-IDF matrix: {tfidf_matrix.shape}")
+        except Exception as e:
+            logger.error(f"Lỗi khi nạp TF-IDF: {str(e)}")
 
 # --- Hàm xây dựng lại các indices ---
 def rebuild_indices():
@@ -1636,17 +1412,6 @@ def add_document(text, filename, chunking_method="sentence_windows", config=None
             "original_text": chunk,  # Lưu trữ văn bản gốc
             "timestamp": datetime.now().isoformat()
         }
-        
-        # Trích xuất và lưu thông tin trang cụ thể cho chunk
-        page_matches = re.findall(r'\[Trang (\d+)\]', chunk)
-        if page_matches:
-            # Lưu tất cả các trang được đề cập trong chunk
-            metadata["pages"] = [int(page) for page in page_matches]
-            # Lưu trang đầu tiên làm trang chính
-            metadata["primary_page"] = int(page_matches[0])
-        else:
-            metadata["pages"] = []
-            metadata["primary_page"] = None
         
         global_metadata.append(metadata)
         global_vector_list.append(vectors[i])
@@ -1959,15 +1724,6 @@ def build_optimized_context(chunks, metadata, question, max_tokens=4000):
     if not chunks:
         return "", []
     
-    # Phát hiện số điều luật cụ thể trong câu hỏi
-    article_number = None
-    article_match = re.search(r'điều\s+(\d+)', question.lower())
-    if article_match:
-        article_number = article_match.group(1)
-    
-    # Phát hiện câu hỏi ngắn gọn
-    is_short_question = len(question.split()) <= 4
-    
     # Phát hiện câu hỏi về điều khoản luật
     is_law_question = False
     law_article_patterns = [
@@ -1981,8 +1737,6 @@ def build_optimized_context(chunks, metadata, question, max_tokens=4000):
     for pattern in law_article_patterns:
         if re.search(pattern, question.lower()):
             is_law_question = True
-            if article_match:
-                article_numbers.append(article_match.group(1))
             break
     
     # Phát hiện câu hỏi yêu cầu trả lời dài
@@ -1990,9 +1744,10 @@ def build_optimized_context(chunks, metadata, question, max_tokens=4000):
     long_answer_patterns = [
         r'giải thích chi tiết', r'trình bày đầy đủ', r'liệt kê tất cả',
         r'nêu rõ', r'phân tích', r'so sánh', r'đánh giá', r'tổng hợp',
-        r'tóm tắt', r'kết luận', r'tổng kết', r'gồm những gì', r'bao gồm',
-        r'các loại', r'các hình thức', r'các yếu tố', r'các nguyên nhân',
-        r'các đặc điểm', r'các đặc trưng', r'các bước', r'quy trình', r'cách thức'
+        r'tóm tắt', r'kết luận', r'tổng kết', r'tại sao', r'lý do',
+        r'ưu nhược điểm', r'các bước', r'quy trình', r'cách thức',
+        r'gồm những gì', r'bao gồm', r'các loại', r'các hình thức',
+        r'các yếu tố', r'các nguyên nhân', r'các đặc điểm', r'các đặc trưng'
     ]
     
     for pattern in long_answer_patterns:
@@ -2019,14 +1774,13 @@ def build_optimized_context(chunks, metadata, question, max_tokens=4000):
     # Phát hiện câu hỏi yêu cầu tổng quan
     requires_overview = False
     overview_patterns = [
-        r'tổng quan', r'tổng quát', r'tổng thể', r'khái quát',
-        r'sơ lược', r'giới thiệu', r'tóm tắt', r'tổng kết'
+        r'tổng quan', r'tổng quát', r'khái quát', r'sơ lược',
+        r'giới thiệu', r'tóm tắt', r'tổng thể', r'toàn cảnh'
     ]
     
     for pattern in overview_patterns:
         if re.search(pattern, question.lower()):
             requires_overview = True
-            logger.info(f"API: Phát hiện câu hỏi yêu cầu tổng quan: {question}")
             break
     
     # Tối ưu hóa cho câu trả lời dài
@@ -2266,24 +2020,6 @@ def build_optimized_context(chunks, metadata, question, max_tokens=4000):
     if token_limit_reached:
         context_parts.append("(Đã cắt bớt một số nội dung do giới hạn độ dài)")
     
-    # Sắp xếp context cho câu hỏi điều luật
-    if is_law_question and article_number:
-        # Đưa các đoạn văn chứa điều luật cụ thể lên đầu context
-        reordered_context_parts = []
-        remaining_parts = []
-        
-        for part in context_parts:
-            part_lower = part.lower()
-            if f"điều {article_number}" in part_lower or f"điều {article_number}." in part_lower:
-                reordered_context_parts.append(part)
-            else:
-                remaining_parts.append(part)
-        
-        # Nếu tìm thấy đoạn văn có điều luật cụ thể, kết hợp với các đoạn còn lại
-        if reordered_context_parts:
-            context_parts = reordered_context_parts + remaining_parts
-            logger.info(f"Đã sắp xếp lại context, đưa {len(reordered_context_parts)} đoạn văn chứa điều {article_number} lên đầu")
-    
     # Kết hợp tất cả các phần
     context = "\n".join(context_parts)
     
@@ -2293,17 +2029,18 @@ def build_optimized_context(chunks, metadata, question, max_tokens=4000):
 
 def transform_query_for_vietnamese(query, model="gemini-2.0-flash"):
     """
-    Chuẩn hóa truy vấn tiếng Việt
+    Biến đổi truy vấn để tối ưu cho tiếng Việt
     
-    Hàm này thực hiện chuẩn hóa cơ bản cho câu truy vấn tiếng Việt.
-    Không còn tạo các biến thể truy vấn.
+    Hàm này áp dụng các kỹ thuật xử lý ngôn ngữ tự nhiên đặc biệt cho
+    tiếng Việt để cải thiện chất lượng truy vấn, bao gồm mở rộng truy vấn,
+    phân tích từ khóa, và chuẩn hóa.
     
     Args:
         query (str): Truy vấn gốc
-        model (str): Không còn sử dụng, giữ lại để tương thích
+        model (str): Mô hình sử dụng để biến đổi truy vấn
         
     Returns:
-        dict: Kết quả chứa truy vấn gốc và đã chuẩn hóa
+        str: Truy vấn đã được tối ưu hóa
     """
     # Chuẩn hóa truy vấn
     normalized_query = query
@@ -2313,13 +2050,148 @@ def transform_query_for_vietnamese(query, model="gemini-2.0-flash"):
         except Exception as e:
             logger.error(f"Lỗi khi chuẩn hóa truy vấn: {str(e)}")
     
-    # Trả về kết quả đơn giản
-    return {
-        "original_query": query,
-        "normalized_query": normalized_query,
-        "query_variants": [query],
-        "analysis": {}
-    }
+    # Sử dụng LLM để mở rộng truy vấn
+    expansion_prompt = f"""
+    Hãy phân tích và mở rộng câu truy vấn sau đây để tăng khả năng tìm kiếm thông tin liên quan trong tài liệu tiếng Việt.
+
+    Truy vấn gốc: "{query}"
+
+    Hãy trả về kết quả theo định dạng sau:
+    1. Phân tích cấu trúc câu hỏi:
+       - Loại câu hỏi (what, how, why, etc.)
+       - Chủ đề chính
+       - Các yếu tố quan trọng cần tìm
+       - Mức độ chi tiết yêu cầu (tổng quan/chi tiết)
+
+    2. Các từ khóa chính:
+       - Danh từ quan trọng
+       - Động từ quan trọng
+       - Tính từ quan trọng
+       - Cụm từ quan trọng
+
+    3. Các từ đồng nghĩa và liên quan:
+       - Từ đồng nghĩa
+       - Từ liên quan ngữ nghĩa
+       - Từ trong cùng phạm trù
+
+    4. Các cách diễn đạt khác:
+       - Cách diễn đạt trang trọng
+       - Cách diễn đạt thông thường
+       - Cách diễn đạt chuyên ngành
+
+    5. Các câu hỏi liên quan:
+       - Câu hỏi mở rộng
+       - Câu hỏi chi tiết
+       - Câu hỏi bổ sung
+
+    6. Các truy vấn con:
+       - Truy vấn định nghĩa
+       - Truy vấn ví dụ
+       - Truy vấn giải thích
+       - Truy vấn so sánh
+
+    Chỉ trả về kết quả theo định dạng trên, không thêm bất kỳ giải thích nào.
+    """
+    
+    try:
+        # Sử dụng hàm generate_with_retry đã có
+        expansion_result = generate_with_retry(expansion_prompt, {
+            "temperature": 0.3,
+            "top_p": 0.95,
+            "top_k": 40,
+            "max_output_tokens": 2048,
+        })
+        
+        # Phân tích kết quả
+        analysis = {}
+        current_section = None
+        current_subsection = None
+        
+        for line in expansion_result.strip().split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Xác định section chính
+            if line.startswith('1. '):
+                current_section = 'analysis'
+                analysis[current_section] = {}
+            elif line.startswith('2. '):
+                current_section = 'keywords'
+                analysis[current_section] = {}
+            elif line.startswith('3. '):
+                current_section = 'synonyms'
+                analysis[current_section] = {}
+            elif line.startswith('4. '):
+                current_section = 'paraphrases'
+                analysis[current_section] = {}
+            elif line.startswith('5. '):
+                current_section = 'related_questions'
+                analysis[current_section] = {}
+            elif line.startswith('6. '):
+                current_section = 'sub_queries'
+                analysis[current_section] = {}
+            # Xác định subsection
+            elif line.startswith('- '):
+                if current_section:
+                    key = line.replace('- ', '').split(':')[0].strip()
+                    value = line.split(':')[1].strip() if ':' in line else ''
+                    if value:
+                        analysis[current_section][key] = [v.strip() for v in value.split(',')]
+                    else:
+                        current_subsection = key
+                        analysis[current_section][current_subsection] = []
+            # Thêm giá trị vào subsection hiện tại
+            elif current_section and current_subsection and line:
+                analysis[current_section][current_subsection].append(line)
+        
+        # Tạo các biến thể truy vấn dựa trên phân tích
+        query_variants = [query]  # Bắt đầu với truy vấn gốc
+        
+        # Thêm các cách diễn đạt khác
+        if 'paraphrases' in analysis:
+            for style, phrases in analysis['paraphrases'].items():
+                query_variants.extend(phrases)
+        
+        # Tạo truy vấn mở rộng với từ khóa
+        if 'keywords' in analysis:
+            keywords = []
+            for key_type, words in analysis['keywords'].items():
+                keywords.extend(words)
+            expanded_query = f"{query} {' '.join(keywords)}"
+            query_variants.append(expanded_query)
+        
+        # Thêm các truy vấn con
+        if 'sub_queries' in analysis:
+            for query_type, queries in analysis['sub_queries'].items():
+                query_variants.extend(queries)
+        
+        # Loại bỏ các biến thể trống hoặc quá ngắn
+        query_variants = [q for q in query_variants if len(q.strip()) > 5]
+        
+        # Loại bỏ các biến thể trùng lặp
+        query_variants = list(set(query_variants))
+        
+        # Sắp xếp các biến thể theo độ dài (ưu tiên các truy vấn ngắn và súc tích)
+        query_variants.sort(key=len)
+        
+        logger.info(f"Đã tạo {len(query_variants)} biến thể truy vấn cho: '{query}'")
+        
+        return {
+            "original_query": query,
+            "normalized_query": normalized_query,
+            "query_variants": query_variants,
+            "analysis": analysis
+        }
+    except Exception as e:
+        logger.error(f"Lỗi khi biến đổi truy vấn: {str(e)}")
+        # Trả về phiên bản đơn giản nếu có lỗi
+        return {
+            "original_query": query,
+            "normalized_query": normalized_query,
+            "query_variants": [query],
+            "analysis": {}
+        }
 
 def rerank_results_for_vietnamese(question, chunks, metadata, top_k=10):
     """
@@ -2489,98 +2361,6 @@ def rerank_results_for_vietnamese(question, chunks, metadata, top_k=10):
     
     return reranked_chunks, reranked_metadata
 
-def split_multiple_questions(question):
-    """
-    Phân tách nhiều câu hỏi trong một câu đầu vào
-    
-    Args:
-        question (str): Câu hỏi đầu vào có thể chứa nhiều câu hỏi
-        
-    Returns:
-        list: Danh sách các câu hỏi đã tách
-    """
-    # Đảm bảo question không phải None và là chuỗi
-    if question is None:
-        return [""]
-        
-    # Tạo danh sách để lưu tất cả các câu hỏi tìm thấy
-    all_questions = []
-    
-    # Bước 1: Tách câu hỏi dựa trên từ khóa kết nối
-    connectors = [r'và', r'cùng với', r'đồng thời', r'ngoài ra', r'bên cạnh đó', r'thêm vào đó', r',']
-    connector_pattern = r'|'.join([fr'({c})' for c in connectors])
-    
-    # Tìm tất cả câu kết thúc bằng dấu hỏi và phân tách theo từ kết nối
-    question_segments = re.split(f'({connector_pattern})\\s+', question)
-    
-    # Xử lý các phân đoạn và cố gắng xây dựng lại các câu hỏi hoàn chỉnh
-    current_segment = ""
-    for i, segment in enumerate(question_segments):
-        # Segment có thể None khi phân tách regex
-        if segment is None:
-            continue
-            
-        # Bỏ qua nếu segment là từ kết nối
-        if any(re.match(f'^{c}$', segment.strip(), re.IGNORECASE) for c in connectors):
-            # Nếu segment hiện tại có nội dung và kết thúc bằng dấu hỏi, thêm vào danh sách
-            if current_segment and current_segment.strip().endswith('?'):
-                all_questions.append(current_segment.strip())
-                current_segment = ""
-            continue
-        
-        # Thêm segment vào câu hỏi hiện tại
-        current_segment += segment
-        
-        # Nếu kết thúc bằng dấu hỏi, thêm vào danh sách và reset
-        if segment.strip().endswith('?'):
-            all_questions.append(current_segment.strip())
-            current_segment = ""
-    
-    # Thêm phần còn lại nếu có
-    if current_segment.strip():
-        # Thêm dấu hỏi nếu chưa có
-        if not current_segment.strip().endswith('?'):
-            current_segment += '?'
-        all_questions.append(current_segment.strip())
-    
-    # Bước 2: Tách câu hỏi dựa trên dấu chấm câu
-    if not all_questions:
-        sentences = re.split(r'[.!?]\s+', question)
-        
-        for sentence in sentences:
-            # Chỉ thêm câu có dấu hỏi hoặc có từ khóa hỏi
-            if ('?' in sentence or 
-                any(keyword in sentence.lower() for keyword in 
-                    ['là gì', 'như thế nào', 'ra sao', 'thế nào', 'ở đâu', 'khi nào', 
-                     'tại sao', 'vì sao', 'bao nhiêu', 'như nào', 'làm sao', 'làm thế nào'])):
-                # Thêm dấu hỏi nếu không có
-                if not sentence.strip().endswith('?'):
-                    sentence += '?'
-                all_questions.append(sentence.strip())
-    
-    # Bước 3: Tìm kiếm các câu hỏi dạng đánh số hoặc dấu chấm
-    numbered_questions = re.findall(r'(?:\d+[\.\)]\s*|\([a-zA-Z]\)\s*|[a-zA-Z]\)\s*)([^.!?]+\??)', question)
-    if numbered_questions:
-        for q in numbered_questions:
-            clean_q = q.strip()
-            if not clean_q.endswith('?'):
-                clean_q += '?'
-            if clean_q not in all_questions:
-                all_questions.append(clean_q)
-    
-    # Nếu không tìm thấy câu hỏi nào, trả về câu hỏi gốc
-    if not all_questions:
-        return [question]
-    
-    # Loại bỏ câu quá ngắn và câu trùng lặp
-    filtered_questions = []
-    for q in all_questions:
-        if len(q.split()) >= 2 and q not in filtered_questions:
-            filtered_questions.append(q)
-    
-    logger.info(f"Đã tách thành {len(filtered_questions)} câu hỏi: {filtered_questions}")
-    return filtered_questions if filtered_questions else [question]
-
 # --- Hàm trả lời câu hỏi với nhiều cải tiến ---
 def answer_question(question, top_k=20, threshold=5.0, model="gemini-2.0-flash", chunking_method=None):
     """
@@ -2605,145 +2385,19 @@ def answer_question(question, top_k=20, threshold=5.0, model="gemini-2.0-flash",
     """
     global faiss_index, global_metadata, tfidf_vectorizer, tfidf_matrix
     
-    # Nạp trạng thái hệ thống của người dùng đang đăng nhập
-    load_state()
-    
     if faiss_index is None or len(global_metadata) == 0:
-        return {
-            "answer": "Chưa có tài liệu nào để tra cứu.",
-            "sources": [],
-            "suggested_questions": []
-        }
-    
-    # Phân tách nhiều câu hỏi nếu có
-    questions = split_multiple_questions(question)
-    
-    # Nếu có nhiều câu hỏi, xử lý từng câu và kết hợp kết quả
-    if len(questions) > 1:
-        logger.info(f"Xử lý {len(questions)} câu hỏi riêng biệt")
-        
-        all_answers = []
-        all_sources = []
-        all_suggested_questions = {}  # Sử dụng dict để lưu gợi ý cho từng câu hỏi không tìm thấy thông tin
-        
-        for i, single_question in enumerate(questions):
-            logger.info(f"Xử lý câu hỏi {i+1}/{len(questions)}: {single_question}")
-            
-            # Gọi đệ quy để xử lý từng câu hỏi
-            result = answer_question(single_question, top_k, threshold, model, chunking_method)
-            
-            # Thêm câu hỏi vào đầu câu trả lời
-            answer_with_question = f"{single_question}\n\n{result['answer']}"
-            all_answers.append(answer_with_question)
-            
-            # Thêm nguồn tài liệu
-            all_sources.extend(result['sources'])
-            
-            # Lưu gợi ý cho câu hỏi không tìm thấy thông tin
-            if "Không có thông tin liên quan trong tài liệu." in result['answer'] and result['suggested_questions']:
-                all_suggested_questions[single_question] = result['suggested_questions']
-        
-        # Kết hợp các câu trả lời
-        combined_answer = "\n\n---\n\n".join(all_answers)
-        
-        # Loại bỏ các nguồn trùng lặp
-        unique_sources = []
-        for source in all_sources:
-            if source not in unique_sources:
-                unique_sources.append(source)
-        
-        return {
-            "answer": combined_answer,
-            "sources": unique_sources,
-            "suggested_questions": all_suggested_questions  # Trả về dict gợi ý cho từng câu hỏi
-        }
+        return "Chưa có tài liệu nào để tra cứu.", []
     
     # Bắt đầu đo thời gian truy xuất
     start_retrieval = time.time()
     
     # Phát hiện câu hỏi về điều khoản luật
     is_law_question = False
-    article_number = None
     law_article_patterns = [
         r'điều\s+\d+', r'khoản\s+\d+', r'điểm\s+\d+',
         r'chính sách', r'nguyên tắc', r'quy định', r'luật'
     ]
     
-    # Phát hiện số điều luật cụ thể
-    article_match = re.search(r'điều\s+(\d+)', question.lower())
-    if article_match:
-        article_number = article_match.group(1)
-        is_law_question = True
-        
-        # Phát hiện câu hỏi ngắn gọn về điều luật như "Điều 33 gồm?" hoặc "Điều 33?"
-        if len(question.split()) <= 4:
-            # Mở rộng câu hỏi để tăng khả năng tìm kiếm
-            original_question = question
-            expanded_questions = [
-                f"Điều {article_number} bao gồm những gì?",
-                f"Nội dung của Điều {article_number} là gì?",
-                f"Điều {article_number} quy định những gì?",
-                f"Điều {article_number} nói về vấn đề gì?"
-            ]
-            
-            # Lưu câu hỏi gốc
-            logger.info(f"Phát hiện câu hỏi ngắn gọn về điều luật: {question}")
-            logger.info(f"Mở rộng thành: {expanded_questions}")
-            
-            # Thử từng câu hỏi mở rộng cho đến khi tìm được kết quả
-            for expanded_question in expanded_questions:
-                # Thực hiện tìm kiếm với câu hỏi mở rộng
-                # Mã hóa câu hỏi mở rộng
-                q_vec = embedder.encode(expanded_question, convert_to_tensor=False).astype('float32')
-                q_vec = np.expand_dims(q_vec, axis=0)
-                
-                # Tìm kiếm với FAISS
-                distances, indices = faiss_index.search(q_vec, min(top_k, faiss_index.ntotal))
-                
-                # Kiểm tra kết quả
-                if min(distances[0]) < threshold:
-                    # Nếu tìm thấy kết quả tốt, sử dụng câu hỏi mở rộng này
-                    logger.info(f"Tìm thấy kết quả tốt với câu hỏi mở rộng: {expanded_question}")
-                    question = expanded_question
-                    break
-    
-    # Kiểm tra các mẫu câu hỏi ngắn gọn khác (không chỉ về điều luật)
-    if len(question.split()) <= 4 and not is_law_question:
-        # Kiểm tra xem có phải định dạng câu hỏi "X là gì?" hoặc "X gồm?" không
-        term_match = re.match(r'^([^?]+)(\s+(là gì|gồm|bao gồm|nghĩa là gì|định nghĩa|gồm những gì))?\??$', question)
-        
-        if term_match:
-            term = term_match.group(1).strip()
-            if len(term) > 0:
-                # Mở rộng câu hỏi
-                original_question = question
-                expanded_questions = [
-                    f"{term} là gì?",
-                    f"{term} được định nghĩa như thế nào?",
-                    f"{term} bao gồm những gì?",
-                    f"{term} có ý nghĩa gì?"
-                ]
-                
-                logger.info(f"Phát hiện câu hỏi ngắn gọn: {question}")
-                logger.info(f"Mở rộng thành: {expanded_questions}")
-                
-                # Thử từng câu hỏi mở rộng
-                for expanded_question in expanded_questions:
-                    # Mã hóa câu hỏi mở rộng
-                    q_vec = embedder.encode(expanded_question, convert_to_tensor=False).astype('float32')
-                    q_vec = np.expand_dims(q_vec, axis=0)
-                    
-                    # Tìm kiếm với FAISS
-                    distances, indices = faiss_index.search(q_vec, min(top_k, faiss_index.ntotal))
-                    
-                    # Kiểm tra kết quả
-                    if min(distances[0]) < threshold:
-                        # Nếu tìm thấy kết quả tốt, sử dụng câu hỏi mở rộng này
-                        logger.info(f"Tìm thấy kết quả tốt với câu hỏi mở rộng: {expanded_question}")
-                        question = expanded_question
-                        break
-    
-    # Tiếp tục kiểm tra các mẫu điều luật
     for pattern in law_article_patterns:
         if re.search(pattern, question.lower()):
             is_law_question = True
@@ -2807,57 +2461,33 @@ def answer_question(question, top_k=20, threshold=5.0, model="gemini-2.0-flash",
         top_k = max(top_k, 30)  # Tăng số lượng chunks cho câu hỏi yêu cầu trả lời chính xác và đầy đủ
     
     # --- QUERY TRANSFORMATION ---
-    # Không sử dụng biến đổi truy vấn nữa, chỉ dùng câu hỏi gốc
-    query_variants = [question]
-    logger.info(f"Sử dụng câu hỏi gốc để tìm kiếm: {question}")
+    # Biến đổi truy vấn để tăng tính liên quan
+    try:
+        transformed_query = transform_query_for_vietnamese(question, model)
+        query_variants = transformed_query["query_variants"]
+        logger.info(f"Đã tạo {len(query_variants)} biến thể truy vấn")
+    except Exception as e:
+        logger.error(f"Lỗi khi biến đổi truy vấn: {str(e)}")
+        query_variants = [question]
     
-    # Tìm kiếm với câu hỏi gốc
+    # Tìm kiếm với tất cả các biến thể truy vấn
     all_indices = []
     all_distances = []
-    article_specific_indices = []  # Để lưu trữ các chỉ mục điều luật cụ thể
-    article_specific_found = False  # Biến cờ để đánh dấu đã tìm thấy điều luật cụ thể chưa
     
-    try:
-        # Mã hóa câu hỏi
-        q_vec = embedder.encode(question, convert_to_tensor=False).astype('float32')
-        q_vec = np.expand_dims(q_vec, axis=0)
-        
-        # Tìm kiếm với FAISS
-        distances, indices = faiss_index.search(q_vec, min(top_k, faiss_index.ntotal))
-        
-        # Thêm vào kết quả
-        all_indices.extend(indices[0])
-        all_distances.extend(distances[0])
-        
-        # Nếu là câu hỏi về điều luật cụ thể
-        if is_law_question and article_number:
-            # Tìm trực tiếp các đoạn văn chứa điều luật cụ thể
-            for idx, meta in enumerate(global_metadata):
-                file_text = meta.get("text", "").lower()
-                meta_article_number = meta.get("article_number")
-                
-                # Kiểm tra bằng article_number trong metadata
-                if meta_article_number == article_number:
-                    article_specific_indices.append(idx)
-                    article_specific_found = True
-                    logger.info(f"Tìm thấy điều luật {article_number} trong metadata")
-                # Hoặc kiểm tra qua nội dung văn bản
-                elif f"điều {article_number}" in file_text or f"điều {article_number}." in file_text:
-                    article_specific_indices.append(idx)
-                    article_specific_found = True
-                    logger.info(f"Tìm thấy điều luật {article_number} trong nội dung")
+    for variant in query_variants:
+        try:
+            # Mã hóa biến thể truy vấn
+            q_vec = embedder.encode(variant, convert_to_tensor=False).astype('float32')
+            q_vec = np.expand_dims(q_vec, axis=0)
             
-            # Nếu tìm thấy điều luật cụ thể, thêm vào kết quả
-            if article_specific_found:
-                logger.info(f"Đã tìm thấy {len(article_specific_indices)} đoạn văn chứa điều luật {article_number}")
-                # Thêm vào đầu kết quả
-                for idx in article_specific_indices:
-                    if idx not in all_indices:
-                        all_indices.insert(0, idx)
-                        # Gán một khoảng cách rất nhỏ để đảm bảo nó được ưu tiên cao nhất
-                        all_distances.insert(0, 0.01)
-    except Exception as e:
-        logger.error(f"Lỗi khi tìm kiếm với câu hỏi '{question}': {str(e)}")
+            # Tìm kiếm với FAISS
+            distances, indices = faiss_index.search(q_vec, min(top_k, faiss_index.ntotal))
+            
+            # Thêm vào kết quả tổng hợp
+            all_indices.extend(indices[0])
+            all_distances.extend(distances[0])
+        except Exception as e:
+            logger.error(f"Lỗi khi tìm kiếm với biến thể '{variant}': {str(e)}")
     
     # Loại bỏ các kết quả trùng lặp và giữ khoảng cách tốt nhất
     unique_indices = {}
@@ -2870,22 +2500,10 @@ def answer_question(question, top_k=20, threshold=5.0, model="gemini-2.0-flash",
         best_distance = min(unique_indices.values())
         if best_distance > threshold * 2:  # Nới lỏng ngưỡng cho hybrid search
             logger.info(f"Không tìm thấy chunks phù hợp. Khoảng cách tốt nhất: {best_distance}")
-            # Tạo câu hỏi gợi ý khi không tìm thấy thông tin
-            suggested_questions = generate_similar_questions(question, global_metadata)
-            return {
-                "answer": "Không có thông tin liên quan trong tài liệu.",
-                "sources": [],
-                "suggested_questions": suggested_questions
-            }
+            return "Không có thông tin liên quan trong tài liệu.", []
     else:
         logger.info("Không tìm thấy kết quả nào từ tìm kiếm ngữ nghĩa")
-        # Tạo câu hỏi gợi ý khi không tìm thấy thông tin
-        suggested_questions = generate_similar_questions(question, global_metadata)
-        return {
-            "answer": "Không có thông tin liên quan trong tài liệu.",
-            "sources": [],
-            "suggested_questions": suggested_questions
-        }
+        return "Không có thông tin liên quan trong tài liệu.", []
     
     # 2. Tìm kiếm từ khóa với TF-IDF nếu có
     keyword_scores = {}
@@ -3003,36 +2621,28 @@ def answer_question(question, top_k=20, threshold=5.0, model="gemini-2.0-flash",
     context, used_files = build_optimized_context(retrieved_chunks, retrieved_metadata, question)
     
     # Xây dựng prompt tối ưu
-    system_prompt = """Bạn là trợ lý AI chuyên trả lời câu hỏi dựa trên tài liệu. Nhiệm vụ của bạn là cung cấp câu trả lời chính xác, đầy đủ và trực tiếp dựa trên thông tin từ các đoạn văn bản được cung cấp.
-
-Hướng dẫn:
-1. Trả lời trực tiếp vào câu hỏi, sử dụng CHÍNH XÁC cách diễn đạt trong tài liệu gốc.
-2. KHÔNG thêm các từ mở đầu thừa như "Theo tài liệu:", "Dựa trên thông tin cung cấp:", v.v.
-3. Nếu không có thông tin liên quan, hãy nói "Không có thông tin liên quan trong tài liệu."
-4. KHÔNG sử dụng kiến thức bên ngoài, chỉ sử dụng thông tin từ các đoạn văn bản được cung cấp.
-5. KHÔNG cắt ngắn câu trả lời gốc, đảm bảo trích dẫn ĐẦY ĐỦ nội dung liên quan.
-6. Nếu câu hỏi yêu cầu liệt kê các điểm, nguyên tắc, chính sách, quy định, v.v., hãy đảm bảo trích dẫn TOÀN BỘ nội dung liên quan, không bỏ sót bất kỳ điểm nào.
-7. Nếu thông tin không đầy đủ, hãy trả lời phần bạn biết và nêu rõ những thông tin còn thiếu.
-8. Nếu không có thông tin liên quan, hãy nói "Không có thông tin liên quan trong tài liệu."
-9. QUAN TRỌNG: Chỉ sử dụng thông tin từ các đoạn văn bản được cung cấp. KHÔNG sử dụng kiến thức bên ngoài.
-10. Đối với các câu hỏi yêu cầu trả lời dài hoặc chi tiết: hãy trả lời ĐẦY ĐỦ và CHI TIẾT, bao gồm tất cả các điểm, ví dụ, giải thích được đề cập trong văn bản.
-11. Sử dụng định dạng có cấu trúc (như đánh số, gạch đầu dòng) khi trả lời các câu hỏi yêu cầu liệt kê nhiều điểm.
-12. Nếu văn bản có nhiều phần, hãy tổng hợp thông tin từ tất cả các phần liên quan để đưa ra câu trả lời đầy đủ nhất.
-13. Luôn ưu tiên sử dụng CHÍNH XÁC cách diễn đạt trong tài liệu gốc, không thêm bớt hay diễn giải lại.
-14. Khi câu hỏi là "X là gì?", hãy trả lời trực tiếp "X là..." mà không thêm bất kỳ từ ngữ nào khác ở đầu câu.
-15. KHÔNG thêm các từ như "Theo tài liệu", "Dựa trên thông tin", "Theo thông tin cung cấp" vào bất kỳ phần nào của câu trả lời.
-16. KHÔNG thêm các kết luận, tóm tắt hoặc ý kiến cá nhân vào cuối câu trả lời.
-17. Nếu câu hỏi yêu cầu một định nghĩa, hãy cung cấp định nghĩa chính xác từ tài liệu mà không thêm từ "Định nghĩa:" vào đầu câu trả lời.
-18. QUAN TRỌNG: Nếu câu hỏi yêu cầu trả lời "chính xác và đầy đủ", hãy đảm bảo bao gồm TẤT CẢ thông tin liên quan từ tài liệu, không bỏ sót bất kỳ chi tiết nào.
-19. Nếu câu hỏi yêu cầu "liệt kê tất cả", hãy đảm bảo liệt kê TOÀN BỘ các mục được đề cập trong tài liệu, không bỏ sót bất kỳ mục nào.
-20. Nếu câu hỏi yêu cầu "giải thích chi tiết", hãy cung cấp giải thích ĐẦY ĐỦ và CHI TIẾT nhất có thể dựa trên thông tin trong tài liệu.
-21. QUAN TRỌNG: Giữ nguyên định dạng xuống dòng và cách trình bày của văn bản gốc. Nếu văn bản gốc có xuống dòng, hãy giữ nguyên các dòng đó trong câu trả lời.
-22. QUAN TRỌNG: Đảm bảo không có lỗi dấu cách trong các từ tiếng Việt. Ví dụ, "k ỹ thuật" phải được viết là "kỹ thuật", "ph ụ tùng" phải được viết là "phụ tùng".
-23. ĐẶC BIỆT QUAN TRỌNG: KHÔNG tách các từ tiếng Việt. Ví dụ, viết "gồm" thay vì "g ồm", "rơ moóc" thay vì "r ơ mo óc", "sơ mi rơ moóc" thay vì "s ơ mi r ơ mo óc".
-24. TUYỆT ĐỐI QUAN TRỌNG: Giữ nguyên định dạng liệt kê như a), b), c) hoặc (a), (b), (c) trong văn bản gốc. KHÔNG chuyển đổi sang định dạng khác.
-25. Đảm bảo các từ tiếng Việt được viết liền mạch, không bị tách ra thành các âm tiết riêng biệt với dấu cách ở giữa.
-26. ĐẶC BIỆT QUAN TRỌNG ĐỐI VỚI ĐIỀU LUẬT: Khi câu hỏi liên quan đến điều luật cụ thể (ví dụ: "Điều 33 gồm?", "Điều 5 là gì?"), hãy trả lời đầy đủ toàn bộ nội dung của điều luật đó, bao gồm tất cả các khoản, điểm, mục. KHÔNG rút gọn nội dung.
-27. Đối với các câu hỏi rất ngắn gọn (ví dụ: "Heartbeat?", "Điều 33?", "Chức năng X?"), hãy hiểu là người dùng đang hỏi về định nghĩa, nội dung hoặc toàn bộ thông tin liên quan đến khái niệm đó.
+    system_prompt = """Bạn là trợ lý AI có khả năng trả lời câu hỏi dựa trên thông tin được cung cấp. 
+    Nhiệm vụ của bạn là:
+    1. Phân tích thông tin từ các đoạn văn bản được cung cấp.
+    2. Trả lời câu hỏi một cách CHÍNH XÁC và ĐẦY ĐỦ, sử dụng CHÍNH XÁC cách diễn đạt trong tài liệu gốc.
+    3. KHÔNG thêm các từ mở đầu thừa như "Định nghĩa:", "Theo tài liệu:", "Dựa trên thông tin cung cấp:", v.v.
+    4. Trả lời trực tiếp vào câu hỏi, giữ nguyên cách diễn đạt trong tài liệu gốc.
+    5. KHÔNG cắt ngắn câu trả lời gốc, đảm bảo trích dẫn ĐẦY ĐỦ nội dung liên quan.
+    6. Nếu câu hỏi yêu cầu liệt kê các điểm, nguyên tắc, chính sách, quy định, v.v., hãy đảm bảo trích dẫn TOÀN BỘ nội dung liên quan, không bỏ sót bất kỳ điểm nào.
+    7. Nếu thông tin không đầy đủ, hãy trả lời phần bạn biết và nêu rõ những thông tin còn thiếu.
+    8. Nếu không có thông tin liên quan, hãy nói "Không có thông tin liên quan trong tài liệu."
+    9. QUAN TRỌNG: Chỉ sử dụng thông tin từ các đoạn văn bản được cung cấp. KHÔNG sử dụng kiến thức bên ngoài.
+    10. Đối với các câu hỏi yêu cầu trả lời dài hoặc chi tiết: hãy trả lời ĐẦY ĐỦ và CHI TIẾT, bao gồm tất cả các điểm, ví dụ, giải thích được đề cập trong văn bản.
+    11. Sử dụng định dạng có cấu trúc (như đánh số, gạch đầu dòng) khi trả lời các câu hỏi yêu cầu liệt kê nhiều điểm.
+    12. Nếu văn bản có nhiều phần, hãy tổng hợp thông tin từ tất cả các phần liên quan để đưa ra câu trả lời đầy đủ nhất.
+    13. Luôn ưu tiên sử dụng CHÍNH XÁC cách diễn đạt trong tài liệu gốc, không thêm bớt hay diễn giải lại.
+    14. Khi câu hỏi là "X là gì?", hãy trả lời trực tiếp "X là..." mà không thêm bất kỳ từ ngữ nào khác ở đầu câu.
+    15. KHÔNG thêm các từ như "Theo tài liệu", "Dựa trên thông tin", "Theo thông tin cung cấp" vào bất kỳ phần nào của câu trả lời.
+    16. KHÔNG thêm các kết luận, tóm tắt hoặc ý kiến cá nhân vào cuối câu trả lời.
+    17. Nếu câu hỏi yêu cầu một định nghĩa, hãy cung cấp định nghĩa chính xác từ tài liệu mà không thêm từ "Định nghĩa:" vào đầu câu trả lời.
+    18. QUAN TRỌNG: Nếu câu hỏi yêu cầu trả lời "chính xác và đầy đủ", hãy đảm bảo bao gồm TẤT CẢ thông tin liên quan từ tài liệu, không bỏ sót bất kỳ chi tiết nào.
+    19. Nếu câu hỏi yêu cầu "liệt kê tất cả", hãy đảm bảo liệt kê TOÀN BỘ các mục được đề cập trong tài liệu, không bỏ sót bất kỳ mục nào.
+    20. Nếu câu hỏi yêu cầu "giải thích chi tiết", hãy cung cấp giải thích ĐẦY ĐỦ và CHI TIẾT nhất có thể dựa trên thông tin trong tài liệu.
     """
 
     
@@ -3057,12 +2667,6 @@ Lưu ý:
 10. QUAN TRỌNG: Nếu câu hỏi yêu cầu trả lời "chính xác và đầy đủ", hãy đảm bảo bao gồm TẤT CẢ thông tin liên quan từ tài liệu, không bỏ sót bất kỳ chi tiết nào.
 11. QUAN TRỌNG: Giữ nguyên định dạng gốc của văn bản. Nếu trong tài liệu các bước được liệt kê theo a), b), c) thì câu trả lời phải giữ nguyên định dạng này (không chuyển thành 1., 2., 3., …).
 12. QUAN TRỌNG: Nếu nội dung trải dài qua nhiều trang, hãy đảm bảo trích dẫn đầy đủ nội dung từ tất cả các trang liên quan.
-13. QUAN TRỌNG: Giữ nguyên định dạng xuống dòng và cách trình bày của văn bản gốc. Nếu văn bản gốc có xuống dòng, hãy giữ nguyên các dòng đó trong câu trả lời.
-14. QUAN TRỌNG: Đảm bảo không có lỗi dấu cách trong các từ tiếng Việt. Ví dụ, "k ỹ thuật" phải được viết là "kỹ thuật", "ph ụ tùng" phải được viết là "phụ tùng".
-15. ĐẶC BIỆT QUAN TRỌNG: KHÔNG tách các từ tiếng Việt. Ví dụ, viết "gồm" thay vì "g ồm", "rơ moóc" thay vì "r ơ mo óc", "sơ mi rơ moóc" thay vì "s ơ mi r ơ mo óc".
-16. TUYỆT ĐỐI QUAN TRỌNG: Giữ nguyên định dạng liệt kê như a), b), c) hoặc (a), (b), (c) trong văn bản gốc. KHÔNG chuyển đổi sang định dạng khác.
-17. Đảm bảo các từ tiếng Việt được viết liền mạch, không bị tách ra thành các âm tiết riêng biệt với dấu cách ở giữa.
-18. Nếu câu hỏi rất ngắn gọn (như "Điều 33?" hoặc "Điều 33 gồm?"), hiểu rằng người dùng muốn biết toàn bộ nội dung của điều luật đó.
 """
     
     # Log để debug
@@ -3098,141 +2702,10 @@ Lưu ý:
         # Đảm bảo giữ nguyên định dạng liệt kê trong câu trả lời
         # Bảo vệ các định dạng liệt kê như a), b), c), (a), (b), (c), v.v.
         answer = re.sub(r'(\s[a-z]\)|\s\([a-z]\))', lambda m: m.group(0), answer)
-        
-        # Sửa lỗi dấu cách trong từ tiếng Việt
-        # Mẫu regex để tìm các từ tiếng Việt bị tách bởi dấu cách
-        vietnamese_patterns = [
-            # Các nguyên âm bị tách
-            (r'([aàáạảãăằắặẳẵâầấậẩẫ])\s+([aàáạảãăằắặẳẵâầấậẩẫ])', r'\1\2'),
-            (r'([eèéẹẻẽêềếệểễ])\s+([eèéẹẻẽêềếệểễ])', r'\1\2'),
-            (r'([iìíịỉĩ])\s+([iìíịỉĩ])', r'\1\2'),
-            (r'([oòóọỏõôồốộổỗơờớợởỡ])\s+([oòóọỏõôồốộổỗơờớợởỡ])', r'\1\2'),
-            (r'([uùúụủũưừứựửữ])\s+([uùúụủũưừứựửữ])', r'\1\2'),
-            (r'([yỳýỵỷỹ])\s+([yỳýỵỷỹ])', r'\1\2'),
-            
-            # Phụ âm đầu bị tách với nguyên âm
-            (r'([bcdđghklmnpqrstvxBCDĐGHKLMNPQRSTVX])\s+([aàáạảãăằắặẳẵâầấậẩẫeèéẹẻẽêềếệểễiìíịỉĩoòóọỏõôồốộổỗơờớợởỡuùúụủũưừứựửữyỳýỵỷỹ])', r'\1\2'),
-            
-            # Các trường hợp phổ biến
-            (r'g\s+ồ', r'gồ'),
-            (r'g\s+ồm', r'gồm'),
-            (r'k\s+é', r'ké'),
-            (r'k\s+éo', r'kéo'),
-            (r'r\s+ơ', r'rơ'),
-            (r'r\s+ơ\s+mo', r'rơ mo'),
-            (r'r\s+ơ\s+moóc', r'rơ moóc'),
-            (r's\s+ơ', r'sơ'),
-            (r's\s+ơ\s+mi', r'sơ mi'),
-            (r's\s+ơ\s+mi\s+r', r'sơ mi r'),
-            (r's\s+ơ\s+mi\s+rơ', r'sơ mi rơ'),
-            (r's\s+ơ\s+mi\s+rơ\s+mo', r'sơ mi rơ mo'),
-            (r's\s+ơ\s+mi\s+rơ\s+moóc', r'sơ mi rơ moóc'),
-            (r'ho\s+ặc', r'hoặc'),
-            (r'c\s+ông', r'công'),
-            (r'd\s+ụng', r'dụng'),
-            (r'kh\s+ối', r'khối'),
-            (r'l\s+ượng', r'lượng'),
-            (r'b\s+ản', r'bản'),
-            (r'th\s+ân', r'thân'),
-            (r'ch\s+ở', r'chở'),
-            (r'ng\s+ười', r'người'),
-            (r'h\s+àng', r'hàng'),
-            (r'h\s+óa', r'hóa'),
-            (r'g\s+ắn', r'gắn'),
-            (r'đ\s+ộng', r'động'),
-            (r'c\s+ơ', r'cơ'),
-            (r'ch\s+ức', r'chức'),
-            (r'n\s+ăng', r'năng'),
-            (r'đ\s+ặc', r'đặc'),
-            (r'bi\s+ệt', r'biệt'),
-            (r'đ\s+ường', r'đường'),
-            (r'b\s+ộ', r'bộ'),
-            (r'ch\s+ạy', r'chạy'),
-            (r'thi\s+ết', r'thiết'),
-            (r'k\s+ế', r'kế'),
-            (r's\s+ản', r'sản'),
-            (r'xu\s+ất', r'xuất'),
-            (r'ho\s+ạt', r'hoạt'),
-            (r'đ\s+ộng', r'động'),
-            (r'r\s+ay', r'ray'),
-            (r'd\s+ẫn', r'dẫn'),
-            (r'đi\s+ện', r'điện'),
-            (r'b\s+ánh', r'bánh'),
-            (r'l\s+ớn', r'lớn'),
-            (r'h\s+ơn', r'hơn'),
-            (r'b\s+ao', r'bao'),
-            
-            # Sửa lỗi cho từ "rơ moóc" và "sơ mi rơ moóc"
-            (r'r\s*ơ\s*mo\s*óc', r'rơ moóc'),
-            (r's\s*ơ\s*mi\s*r\s*ơ\s*mo\s*óc', r'sơ mi rơ moóc'),
-            
-            # Bảo vệ các định dạng liệt kê
-            (r'([a-z])\s*\)', r'\1)'),
-            (r'\(\s*([a-z])\s*\)', r'(\1)'),
-        ]
-        
-        # Áp dụng các mẫu regex để sửa lỗi dấu cách
-        for pattern, replacement in vietnamese_patterns:
-            answer = re.sub(pattern, replacement, answer)
-            
-        # Thêm một bước kiểm tra cuối cùng cho các từ phổ biến
-        common_words = {
-            "g ồm": "gồm",
-            "k éo": "kéo",
-            "r ơ": "rơ",
-            "s ơ": "sơ",
-            "ho ặc": "hoặc",
-            "c ông": "công",
-            "d ụng": "dụng",
-            "kh ối": "khối",
-            "l ượng": "lượng",
-            "b ản": "bản",
-            "th ân": "thân",
-            "ch ở": "chở",
-            "ng ười": "người",
-            "h àng": "hàng",
-            "h óa": "hóa",
-            "g ắn": "gắn",
-            "đ ộng": "động",
-            "c ơ": "cơ",
-            "ch ức": "chức",
-            "n ăng": "năng",
-            "đ ặc": "đặc",
-            "bi ệt": "biệt",
-            "đ ường": "đường",
-            "b ộ": "bộ",
-            "ch ạy": "chạy",
-            "thi ết": "thiết",
-            "k ế": "kế",
-            "s ản": "sản",
-            "xu ất": "xuất",
-            "ho ạt": "hoạt",
-            "đ ộng": "động",
-            "r ay": "ray",
-            "d ẫn": "dẫn",
-            "đi ện": "điện",
-            "b ánh": "bánh",
-            "l ớn": "lớn",
-            "h ơn": "hơn",
-            "b ao": "bao",
-            "rơ mo óc": "rơ moóc",
-            "sơ mi rơ mo óc": "sơ mi rơ moóc"
-        }
-        
-        for wrong, correct in common_words.items():
-            answer = answer.replace(wrong, correct)
-            
-        # Sử dụng Gemini để sửa lỗi tách từ tiếng Việt
-        answer = fix_vietnamese_spacing(answer)
-            
     except Exception as e:
         error_message = str(e)
         logger.error(f"Lỗi khi xử lý câu trả lời: {error_message}")
-        return {
-            "answer": f"Xin lỗi, đã xảy ra lỗi khi xử lý câu hỏi của bạn: {error_message}",
-            "sources": [],
-            "suggested_questions": []
-        }
+        return f"Xin lỗi, đã xảy ra lỗi khi xử lý câu hỏi của bạn: {error_message}", []
     
     # Loại bỏ các từ mở đầu thừa nếu có
     common_prefixes = [
@@ -3274,446 +2747,37 @@ Lưu ý:
     
     # Đảm bảo nội dung trải dài qua nhiều trang được xử lý đúng
     # Loại bỏ các dấu hiệu trang không cần thiết trong câu trả lời cuối cùng
-    # answer = re.sub(r'\[Trang \d+\]\s*', '', answer)
-    
-    # Thay vì xóa hoàn toàn, ta chỉ làm gọn các thông tin trang liên tiếp
-    answer = re.sub(r'\[Trang \d+\]\s*\[Trang \d+\]', lambda m: m.group(0).split(']')[0] + ']', answer)
+    answer = re.sub(r'\[Trang \d+\]\s*', '', answer)
     
     # Thêm thông tin nguồn tài liệu
     if used_files:
-        # Phân tích câu trả lời để xác định nguồn thật sự được sử dụng
-        real_sources = []
-        source_scores = {}  # Lưu điểm số cho mỗi nguồn
-        
-        # Nếu tìm thấy thông tin liên quan
-        if "Không có thông tin liên quan trong tài liệu." not in answer:
-            # Chuẩn bị câu trả lời để so khớp
-            clean_answer = re.sub(r'\n+', ' ', answer)
-            clean_answer = re.sub(r'\s+', ' ', clean_answer)
-            
-            # Chia câu trả lời thành các câu
-            answer_sentences = re.split(r'(?<=[.!?])\s+', clean_answer)
-            
-            # Phân tích context để tìm nguồn thực sự được sử dụng
-            chunks_and_sources = {}
-            
-            for idx, chunk_meta in enumerate(retrieved_metadata):
-                if idx >= len(retrieved_chunks):
-                    continue
-                    
-                chunk_text = retrieved_chunks[idx]
-                file_name = chunk_meta.get("filename", "Unknown")
-                
-                # Chuẩn bị chunk để so khớp - Giữ lại thông tin trang
-                # Chỉ loại bỏ các thông tin không liên quan đến nội dung
-                clean_chunk = re.sub(r'\[Granularity: [^\]]+\]\s*', '', chunk_text)
-                clean_chunk = re.sub(r'\n+', ' ', clean_chunk)
-                clean_chunk = re.sub(r'\s+', ' ', clean_chunk)
-                
-                if file_name not in chunks_and_sources:
-                    chunks_and_sources[file_name] = []
-                chunks_and_sources[file_name].append(clean_chunk)
-                
-                # Khởi tạo điểm số cho nguồn nếu chưa có
-                if file_name not in source_scores:
-                    source_scores[file_name] = 0
-            
-            # Cải thiện thuật toán so khớp nguồn
-            for file_name, chunks in chunks_and_sources.items():
-                file_score = 0  # Điểm số cho mỗi file
-                content_matched = False  # Đánh dấu xem có nội dung khớp quan trọng không
-                exact_sentences_found = 0  # Số câu khớp hoàn toàn
-                
-                for chunk in chunks:
-                    # Chia chunk thành các câu
-                    chunk_sentences = re.split(r'(?<=[.!?])\s+', chunk)
-                    
-                    # 1: Tìm kiếm câu hoàn chỉnh - Ưu tiên cao nhất
-                    for sentence in answer_sentences:
-                        # Chỉ kiểm tra các câu có ý nghĩa
-                        if len(sentence) < 15:  # Bỏ qua câu quá ngắn
-                            continue
-                            
-                        # Loại bỏ các thông tin về trang khi so khớp nội dung
-                        cleaned_sentence = re.sub(r'\[Trang \d+\]\s*', '', sentence)
-                        
-                        # Kiểm tra câu trong chunk
-                        # Sử dụng full_match để đánh dấu trường hợp khớp chính xác
-                        full_match = False
-                        
-                        # Tạo phiên bản cleaned của chunk để so sánh chính xác nội dung
-                        chunk_content_only = re.sub(r'\[Trang \d+\]\s*', '', chunk)
-                        
-                        if cleaned_sentence in chunk_content_only:
-                            file_score += 25  # Tăng điểm cho câu khớp hoàn toàn
-                            exact_sentences_found += 1
-                            content_matched = True
-                            full_match = True
-                        
-                        # Nếu không tìm thấy khớp hoàn toàn, kiểm tra khớp một phần
-                        if not full_match and len(cleaned_sentence) > 30:
-                            # Phân tích từng từ trong câu
-                            words = re.findall(r'\b\w+\b', cleaned_sentence.lower())
-                            chunk_lower = chunk_content_only.lower()
-                            
-                            # Đếm số từ khớp
-                            matched_words = sum(1 for word in words if word in chunk_lower)
-                            
-                            # Tính tỷ lệ khớp
-                            if len(words) > 0:
-                                match_ratio = matched_words / len(words)
-                                
-                                # Nếu tỷ lệ khớp cao
-                                if match_ratio > 0.85:  # Tăng ngưỡng từ 0.8 lên 0.85
-                                    file_score += 20  # Tăng điểm từ 15 lên 20
-                                    content_matched = True
-                                elif match_ratio > 0.7:  # Tăng ngưỡng từ 0.6 lên 0.7
-                                    file_score += 12  # Tăng điểm từ 8 lên 12
-                    
-                    # 2: Tìm kiếm cụm từ có ý nghĩa - Giúp tìm ra các trích dẫn một phần
-                    if not content_matched:  # Chỉ thực hiện nếu chưa tìm thấy khớp hoàn chỉnh
-                        meaningful_phrases_found = 0
-                        
-                        for i in range(len(chunk_sentences)):
-                            for j in range(i, min(i + 3, len(chunk_sentences))):
-                                phrase = ' '.join(chunk_sentences[i:j+1])
-                                if len(phrase) < 30:  # Bỏ qua cụm quá ngắn
-                                    continue
-                                
-                                # Kiểm tra cụm từ trong câu trả lời
-                                if phrase in clean_answer:
-                                    file_score += 10  # Điểm cho cụm khớp
-                                    meaningful_phrases_found += 1
-                                    content_matched = True
-                                    
-                                    # Giới hạn số điểm từ phương pháp này
-                                    if meaningful_phrases_found >= 3:
-                                        break
-                    
-                    # 3: Tìm kiếm từ khóa đặc biệt - Dùng cho các định nghĩa, thuật ngữ
-                    # Chỉ áp dụng nếu chưa tìm thấy khớp hoàn chỉnh hoặc cụm từ
-                    if not content_matched:
-                        special_terms_found = 0
-                        
-                        # Tìm các thuật ngữ đặc biệt 
-                        special_terms = re.findall(r'([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*|"[^"]+"|\'[^\']+\')', chunk)
-                        special_terms += re.findall(r'(\b[A-Za-z]+\b\s+là\s+[^.!?]+)', chunk)  # Mẫu định nghĩa "X là Y"
-                        
-                        for term in special_terms:
-                            if len(term) < 5:  # Bỏ qua thuật ngữ quá ngắn
-                                continue
-                                
-                            if term.lower() in clean_answer.lower():
-                                file_score += 5  # Điểm cho thuật ngữ khớp
-                                special_terms_found += 1
-                                
-                                # Giới hạn số điểm từ phương pháp này
-                                if special_terms_found >= 5:
-                                    break
-                
-                # Bổ sung: Kiểm tra xem có câu trả lời chính xác nằm trong file không
-                # Rất hữu ích cho các câu trả lời ngắn như định nghĩa
-                if len(answer_sentences) <= 3 and len(answer_sentences) > 0:
-                    main_sentence = answer_sentences[0]  # Câu đầu tiên thường là câu trả lời chính
-                    
-                    for chunk in chunks:
-                        # Nếu câu trả lời chính nằm hoàn toàn trong chunk
-                        if main_sentence in chunk and len(main_sentence) > 20:
-                            file_score += 50  # Điểm rất cao cho việc tìm thấy câu trả lời chính xác
-                            content_matched = True
-                
-                # Điều chỉnh điểm dựa trên số lượng câu khớp hoàn toàn
-                if exact_sentences_found > 0:
-                    # Tỷ lệ câu khớp hoàn toàn so với tổng số câu trong câu trả lời
-                    exact_ratio = exact_sentences_found / len(answer_sentences)
-                    
-                    # Nếu hầu hết các câu đều từ file này
-                    if exact_ratio > 0.7:  # Trên 70% câu từ file này
-                        file_score *= 1.5  # Tăng 50% điểm
-                    elif exact_ratio > 0.4:  # Trên 40% câu từ file này
-                        file_score *= 1.2  # Tăng 20% điểm
-                
-                # Lưu điểm số cho nguồn
-                source_scores[file_name] = file_score
-                
-                # Nếu đạt ngưỡng điểm và có nội dung khớp, thêm vào danh sách nguồn thật sự
-                if file_score >= 10 and content_matched and file_name not in real_sources:
-                    real_sources.append(file_name)
-            
-            # Loại bỏ các nguồn có điểm thấp nếu có nguồn điểm cao
-            if real_sources:
-                # Tìm điểm cao nhất
-                max_score = max(source_scores.get(source, 0) for source in real_sources)
-                
-                # Chỉ giữ lại các nguồn có điểm đủ cao (ít nhất 40% điểm cao nhất)
-                filtered_sources = [source for source in real_sources 
-                                   if source_scores.get(source, 0) >= max_score * 0.4]
-                
-                # Nếu lọc còn ít nhất một nguồn, sử dụng danh sách đã lọc
-                if filtered_sources:
-                    real_sources = filtered_sources
-            
-            # Sắp xếp nguồn theo điểm số từ cao xuống thấp
-            sorted_sources = sorted([(s, source_scores.get(s, 0)) for s in real_sources], 
-                                   key=lambda x: x[1], reverse=True)
-            
-            # Debug log
-            logger.info(f"Điểm số nguồn: {sorted_sources}")
-            
-            # Bổ sung: Kiểm tra mức độ trùng lặp chi tiết hơn cho các nguồn có điểm thấp
-            for file_name, file_score in list(source_scores.items()):
-                # Nếu file đã được xác định là nguồn thực sự và có điểm cao, bỏ qua
-                if file_name in real_sources and file_score > 50:
-                    continue
-                    
-                if file_name in chunks_and_sources:
-                    # Kiểm tra xem có bao nhiêu phần trăm câu trả lời xuất hiện trong tài liệu
-                    all_content = ' '.join(chunks_and_sources[file_name])
-                    
-                    # Loại bỏ thông tin trang khi so sánh nội dung
-                    clean_answer_for_compare = re.sub(r'\[Trang \d+\]\s*', '', clean_answer)
-                    clean_all_content = re.sub(r'\[Trang \d+\]\s*', '', all_content)
-                    
-                    # Kiểm tra từng đoạn văn lớn trong câu trả lời
-                    paragraphs = re.split(r'\n{2,}', clean_answer_for_compare)
-                    matched_paragraphs = 0
-                    
-                    for para in paragraphs:
-                        if len(para) < 40:  # Bỏ qua đoạn quá ngắn
-                            continue
-                            
-                        if para in clean_all_content:
-                            matched_paragraphs += 1
-                            # Tăng điểm dựa trên số đoạn văn khớp hoàn toàn
-                            source_scores[file_name] += len(para) / 10  # Điểm tỷ lệ với độ dài đoạn khớp
-                    
-                    # Nếu có nhiều đoạn văn khớp, tăng điểm mạnh
-                    if matched_paragraphs > 1:
-                        source_scores[file_name] += matched_paragraphs * 15
-                        if file_name not in real_sources:
-                            real_sources.append(file_name)
-            
-            # Cập nhật lại danh sách nguồn đã sắp xếp sau khi đánh giá lại
-            sorted_sources = sorted([(s, source_scores.get(s, 0)) for s in real_sources], 
-                                   key=lambda x: x[1], reverse=True)
-            
-            # Chỉ giữ lại các nguồn có điểm số
-            real_sources = [s for s, score in sorted_sources if score > 0]
-            
-            # Nếu không tìm thấy nguồn thật sự, sử dụng tất cả các nguồn đã truy xuất
-            if not real_sources:
-                real_sources = used_files
-        
-        # Hiển thị thông tin nguồn
-        unique_files = list(set(real_sources))
-        
-        # Phân tích sâu hơn để tìm đúng vị trí của thông tin
-        # Sử dụng hàm identify_most_relevant_pages để xác định chính xác các trang chứa câu trả lời
-        relevant_pages_dict = identify_most_relevant_pages(answer, retrieved_chunks, retrieved_metadata)
-        
-        # Chuẩn bị để tạo thông tin trích dẫn chi tiết
-        citation_info = {}
-        
-        # Nếu tìm được trang có liên quan
-        if relevant_pages_dict:
-            for file_name, pages in relevant_pages_dict.items():
-                if file_name in unique_files:
-                    # Chuyển từ set sang list và sắp xếp
-                    sorted_pages = sorted([int(p) for p in pages])
-                    
-                    # Tìm các section, heading hoặc thông tin vị trí từ metadata
-                    section_info = []
-                    
-                    # Thu thập thông tin về section từ metadata
-                    for meta in retrieved_metadata:
-                        if meta.get("filename") == file_name and str(meta.get("primary_page")) in pages:
-                            # Kiểm tra các thông tin cụ thể
-                            article_number = meta.get("article_number")
-                            
-                            if article_number:
-                                section_info.append(f"Điều {article_number}")
-                    
-                    # Tạo chuỗi thông tin trích dẫn
-                    citation = ""
-                    
-                    # Thêm thông tin về số trang - chỉ lấy trang đầu tiên
-                    if sorted_pages:
-                        citation += f"trang {sorted_pages[0]}"
-                    
-                    # Thêm thông tin về section nếu có
-                    if section_info:
-                        unique_sections = list(set(section_info))
-                        if citation:
-                            citation += ", "
-                        citation += ", ".join(unique_sections)
-                    
-                    # Lưu thông tin trích dẫn cho file này
-                    citation_info[file_name] = citation
-        else:
-            # Nếu không tìm được trang cụ thể, sử dụng phương pháp cũ
-            source_with_pages = {}
-            
-            for idx, chunk_meta in enumerate(retrieved_metadata):
-                if idx >= len(retrieved_chunks):
-                    continue
-                        
-                file_name = chunk_meta.get("filename", "Unknown")
-                if file_name in unique_files:
-                    # Thu thập thông tin trang
-                    primary_page = chunk_meta.get("primary_page")
-                    pages = chunk_meta.get("pages", [])
-                    
-                    if not pages:
-                        # Nếu không có trong metadata, trích xuất từ text
-                        chunk_text = retrieved_chunks[idx]
-                        page_info = re.findall(r'\[Trang (\d+)\]', chunk_text)
-                        pages = [int(p) for p in page_info]
-                    
-                    if file_name not in source_with_pages:
-                        source_with_pages[file_name] = set()
-                    
-                    # Thêm số trang vào tập hợp
-                    for page in pages:
-                        source_with_pages[file_name].add(str(page))
-            
-            # Tạo thông tin trích dẫn đơn giản - chỉ lấy trang đầu tiên
-            for file_name, pages in source_with_pages.items():
-                if pages:
-                    sorted_pages = sorted([int(p) for p in pages])
-                    citation_info[file_name] = f"trang {sorted_pages[0]}"
-                else:
-                    citation_info[file_name] = ""
-        
-        # Tạo chuỗi nguồn với thông tin trích dẫn đầy đủ
-        source_strings = []
-        for file_name in unique_files:
-            citation = citation_info.get(file_name, "")
-            if citation:
-                # Thêm một dấu hiệu để đánh dấu nguồn chứa câu trả lời (ví dụ: dấu *)
-                extension = file_name.split('.')[-1].lower() if '.' in file_name else ""
-                
-                # Đặt dấu * cho nguồn chính xác
-                if extension in ['pdf', 'docx', 'txt'] and citation.startswith("trang"):
-                    # Đây là nguồn chính, thêm dấu *
-                    source_strings.append(f"{file_name} ({citation})*")
-                else:
-                    source_strings.append(f"{file_name} ({citation})")
-            else:
-                source_strings.append(file_name)
-        
-        # Sắp xếp để nguồn chính xác (có dấu *) lên đầu
-        source_strings.sort(key=lambda s: 0 if s.endswith('*') else 1)
-        
-        # Loại bỏ dấu * trước khi hiển thị
-        formatted_sources = [s[:-1] if s.endswith('*') else s for s in source_strings]
-        
-        sources_info = f"\n\nNguồn tài liệu: {', '.join(formatted_sources)}"
-        answer += sources_info
-    else:
-        # Nếu không tìm thấy nguồn thật sự, vẫn hiển thị tất cả các nguồn đã truy xuất
-        sources_info = f"\n\nNguồn tài liệu: {', '.join(used_files)}"
+        unique_files = list(set(used_files))
+        sources_info = f"\n\nNguồn tài liệu: {', '.join(unique_files)}"
         answer += sources_info
     
     # Kết thúc đo thời gian trả lời
     end_answer = time.time()
     answer_time = end_answer - start_answer
     
-    # Ghi log thời gian xử lý
-    logger.info(f"Thời gian truy xuất: {retrieval_time:.2f}s, Thời gian trả lời: {answer_time:.2f}s")
-    
     # Theo dõi hiệu suất
+    if chunking_method is None:
+        # Xác định phương pháp chunking phổ biến nhất trong các chunks được sử dụng
+        chunking_methods = [meta.get("chunking_method", "unknown") for meta in retrieved_metadata if "chunking_method" in meta]
+        if chunking_methods:
+            chunking_method = Counter(chunking_methods).most_common(1)[0][0]
+        else:
+            chunking_method = "unknown"
+    
+    # Theo dõi hiệu suất với cả hai hàm
     track_performance(question, retrieval_time, answer_time, len(retrieved_chunks), chunking_method)
+    track_performance_metrics(question, retrieval_time, answer_time, len(retrieved_chunks), chunking_method)
     
-    # Tạo câu hỏi gợi ý cho cả trường hợp tìm thấy câu trả lời
-    suggested_questions = []
-    if "Không có thông tin liên quan trong tài liệu." in answer:
-        # Tạo câu hỏi gợi ý khi không tìm thấy thông tin
-        suggested_questions = generate_similar_questions(question, global_metadata)
-    
-    # Trả về kết quả
-    return {
-        "answer": answer,
-        "sources": used_files,
-        "suggested_questions": suggested_questions
-    }
-
-def generate_similar_questions(question, metadata):
-    """
-    Tạo các câu hỏi gợi ý dựa trên câu hỏi gốc và metadata của tài liệu
-    
-    Args:
-        question (str): Câu hỏi gốc
-        metadata (list): Metadata của các chunks trong tài liệu
-        
-    Returns:
-        list: Danh sách các câu hỏi gợi ý
-    """
-    try:
-        # Tạo prompt để sinh câu hỏi gợi ý tương tự với câu hỏi gốc
-        prompt = f"""Tạo 3 câu hỏi có ý nghĩa tương tự với câu hỏi gốc: "{question}"
-
-                Yêu cầu:
-                1. Các câu hỏi được tạo ra phải gần nghĩa nhất, tương tự nhất và liên quan nhất đối với câu hỏi gốc
-                2. Chỉ liệt kê 3 câu hỏi theo định dạng số thứ tự
-                3. Không thêm bất kỳ giải thích, phân tích hay nhận xét nào
-                4. Không đề cập đến việc phân tích lĩnh vực hay chuyên môn
-                5. Không có lời mở đầu hay kết luận
-                6. Câu hỏi gốc nếu có các từ khóa tiếng anh thì giữ nguyên tiếng anh không được tự ý dịch lại tiếng việt
-
-                Trả lời theo định dạng chính xác sau:
-                1. [Câu hỏi 1]
-                2. [Câu hỏi 2]
-                3. [Câu hỏi 3]"""
-        
-        # Sử dụng hàm generate_with_retry đã có
-        response = generate_with_retry(prompt, {
-            "temperature": 0.7,
-            "top_p": 0.95,
-            "top_k": 40,
-            "max_output_tokens": 1024,
-        })
-        
-        # Tách các câu hỏi thành danh sách
-        suggested_questions = []
-        for line in response.strip().split('\n'):
-            # Loại bỏ số thứ tự và khoảng trắng
-            clean_line = re.sub(r'^\d+\.\s*', '', line.strip())
-            if clean_line:
-                suggested_questions.append(clean_line)
-        
-        # Đảm bảo có đúng 3 câu hỏi
-        if len(suggested_questions) < 3:
-            # Thêm câu hỏi mặc định nếu thiếu
-            default_questions = [
-                f"Bạn có thể cung cấp thêm thông tin về {question}?",
-                f"Tài liệu có đề cập đến {question} không?",
-                f"Có thông tin nào liên quan đến {question} trong tài liệu không?"
-            ]
-            suggested_questions.extend(default_questions[:(3 - len(suggested_questions))])
-        
-        # Giới hạn số lượng câu hỏi là 3
-        return suggested_questions[:3]
-    except Exception as e:
-        logger.error(f"Lỗi khi tạo câu hỏi gợi ý: {str(e)}")
-        # Trả về câu hỏi mặc định nếu có lỗi
-        return [
-            f"Bạn có thể cung cấp thêm thông tin về {question}?",
-            f"Tài liệu có đề cập đến {question} không?",
-            f"Có thông tin nào liên quan đến {question} trong tài liệu không?"
-        ]
+    return answer, used_files
 
 # --- API routes cho hiệu suất và đánh giá ---
 @app.route('/api/performance', methods=['GET'])
 def get_performance():
     """API endpoint để lấy thông tin hiệu suất"""
-    # Yêu cầu đăng nhập trước khi truy cập API
-    from supabase_modules.auth import verify_session
-    if not verify_session():
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    # Nạp trạng thái hệ thống của người dùng đã đăng nhập
-    load_state()
-    
     chunking_method = request.args.get('chunking_method')
     analysis = analyze_performance(chunking_method)
     return jsonify(analysis)
@@ -3721,14 +2785,6 @@ def get_performance():
 @app.route('/api/embeddings', methods=['GET'])
 def view_embeddings():
     """Endpoint để xem thông tin về embeddings"""
-    # Yêu cầu đăng nhập trước khi truy cập API
-    from supabase_modules.auth import verify_session
-    if not verify_session():
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    # Nạp trạng thái hệ thống của người dùng đã đăng nhập
-    load_state()
-    
     try:
         response = {
             'total_documents': len(global_all_files),
@@ -3766,14 +2822,6 @@ def view_embeddings():
 @app.route('/api/evaluate', methods=['POST'])
 def evaluate_system():
     """API endpoint để đánh giá hệ thống với một tập câu hỏi"""
-    # Yêu cầu đăng nhập trước khi truy cập API
-    from supabase_modules.auth import verify_session
-    if not verify_session():
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    # Nạp trạng thái hệ thống của người dùng đã đăng nhập
-    load_state()
-    
     data = request.json
     if not data or 'queries' not in data:
         return jsonify({"error": "Cần cung cấp danh sách câu hỏi"}), 400
@@ -3791,11 +2839,6 @@ def evaluate_system():
 @app.route('/api/chunking_methods', methods=['GET'])
 def get_chunking_methods():
     """Trả về danh sách các phương pháp chunking được hỗ trợ"""
-    # Yêu cầu đăng nhập trước khi truy cập API
-    from supabase_modules.auth import verify_session
-    if not verify_session():
-        return jsonify({"error": "Unauthorized"}), 401
-        
     methods = {
         "sentence_windows": "Cửa sổ câu - Chia văn bản thành các cửa sổ trượt của các câu liên tiếp",
         "paragraph": "Đoạn văn - Chia văn bản thành các đoạn văn riêng biệt",
@@ -3813,14 +2856,6 @@ def get_chunking_methods():
 @app.route('/api/answer', methods=['POST'])
 def api_answer_question():
     """API endpoint để trả lời câu hỏi"""
-    # Yêu cầu đăng nhập trước khi truy cập API
-    from supabase_modules.auth import verify_session
-    if not verify_session():
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    # Nạp trạng thái hệ thống của người dùng đã đăng nhập
-    load_state()
-    
     data = request.json
     if not data or 'question' not in data:
         return jsonify({"error": "Cần cung cấp câu hỏi"}), 400
@@ -3847,12 +2882,7 @@ def api_answer_question():
             break
     
     try:
-        result = answer_question(question, top_k, threshold, model, chunking_method)
-        return jsonify({
-            "answer": result["answer"],
-            "sources": result["sources"],
-            "suggested_questions": result["suggested_questions"]
-        })
+        answer, sources = answer_question(question, top_k, threshold, model, chunking_method)
     except Exception as e:
         error_message = str(e)
         logger.error(f"API: Lỗi khi trả lời câu hỏi: {error_message}")
@@ -3864,21 +2894,29 @@ def api_answer_question():
             logger.info(f"API: Giảm top_k từ {top_k} xuống {reduced_top_k} và thử lại")
             
             try:
-                result = answer_question(question, reduced_top_k, threshold, model, chunking_method)
+                answer, sources = answer_question(question, reduced_top_k, threshold, model, chunking_method)
+            except Exception as e2:
+                logger.error(f"API: Vẫn lỗi sau khi giảm top_k: {str(e2)}")
                 return jsonify({
-                    "answer": result["answer"],
-                    "sources": result["sources"],
-                    "suggested_questions": result["suggested_questions"],
-                    "warning": f"Đã giảm số lượng đoạn văn bản từ {top_k} xuống {reduced_top_k} do giới hạn token"
-                })
-            except Exception as inner_e:
-                return jsonify({
-                    "error": f"Lỗi khi trả lời câu hỏi (sau khi giảm top_k): {str(inner_e)}"
+                    "error": "Lỗi khi xử lý câu hỏi do văn bản quá dài",
+                    "details": str(e),
+                    "question": question,
+                    "is_law_question": is_law_question
                 }), 500
-        
-        return jsonify({
-            "error": f"Lỗi khi trả lời câu hỏi: {error_message}"
-        }), 500
+        else:
+            return jsonify({
+                "error": "Lỗi khi xử lý câu hỏi",
+                "details": error_message,
+                "question": question,
+                "is_law_question": is_law_question
+            }), 500
+    
+    return jsonify({
+        "question": question,
+        "answer": answer,
+        "sources": sources,
+        "is_law_question": is_law_question
+    })
 
 # --- Hàm tải cài đặt ---
 def load_settings():
@@ -3926,57 +2964,22 @@ def load_settings():
 # Route cho trang chủ
 @app.route('/')
 def index():
-    """
-    Trang chủ của ứng dụng RAG
-    
-    Kiểm tra session người dùng và hiển thị trang chính
-    """
-    # Yêu cầu đăng nhập trước khi truy cập hệ thống
-    from supabase_modules.auth import verify_session
-    if not verify_session():
-        return redirect(url_for('login'))
-    
-    # Nạp danh sách tài liệu của người dùng đã đăng nhập
-    from supabase_modules.helpers import get_user_id_from_session, get_user_files_with_metadata
-    user_id = get_user_id_from_session()
-    
-    # Nạp trạng thái hệ thống của người dùng đã đăng nhập
-    global global_all_files
-    load_state()  # Đảm bảo nạp dữ liệu của người dùng hiện tại
-    
     return render_template_string(
         index_html, 
         files=global_all_files,
         settings=load_settings(),
         answer=None,
-        sources=None
+        sources=None,
+        upload_result=None
     )
 
 # Route cho truy vấn
 @app.route('/query', methods=['POST'])
 def query():
-    """
-    Xử lý câu hỏi từ người dùng
-    """
-    # Yêu cầu đăng nhập trước khi truy cập hệ thống
-    from supabase_modules.auth import verify_session
-    if not verify_session():
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({
-                'success': False,
-                'message': 'Vui lòng đăng nhập để sử dụng hệ thống'
-            }), 401
-        return redirect(url_for('login'))
-    
-    # Nạp trạng thái hệ thống của người dùng đã đăng nhập
-    load_state()  # Đảm bảo nạp dữ liệu của người dùng hiện tại
-    
-    # Tiếp tục với logic xử lý câu hỏi
-    question = request.form.get('question')
-    top_k = int(request.form.get('top_k', 20))
-    threshold = float(request.form.get('threshold', 5.0))
+    question = request.form.get('question', '')
     model = request.form.get('model', 'gemini-2.0-flash')
-    chunking_method = request.form.get('chunking_method', None)
+    top_k = int(request.form.get('top_k', 10))
+    threshold = float(request.form.get('threshold', 5.0))
     
     # Kiểm tra xem có phải là AJAX request không
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -3990,7 +2993,11 @@ def query():
         if is_ajax:
             logger.info("Returning AJAX empty question response")
             return render_template_string(
-                """<div class="chat-message bot-message"><p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">Vui lòng nhập câu hỏi.</p></div>"""
+                """
+                <div class="chat-message bot-message">
+                    <p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">Vui lòng nhập câu hỏi.</p>
+                </div>
+                """
             )
         else:
             return render_template_string(
@@ -4001,157 +3008,269 @@ def query():
                 sources=[]
             )
     
+    # Phát hiện câu hỏi về điều khoản luật
+    is_law_question = False
+    law_article_patterns = [
+        r'điều\s+\d+', r'khoản\s+\d+', r'điểm\s+\d+',
+        r'chính sách', r'nguyên tắc', r'quy định', r'luật'
+    ]
+    
+    for pattern in law_article_patterns:
+        if re.search(pattern, question.lower()):
+            is_law_question = True
+            logger.info(f"Web UI: Phát hiện câu hỏi về điều khoản luật: {question}")
+            # Tăng top_k cho câu hỏi về luật
+            top_k = max(top_k, 30)
+            break
+    
     try:
-        # Đảm bảo question không phải None và là chuỗi trước khi xử lý
-        if question is None:
-            question = ""
-        
-        result = answer_question(question, top_k, threshold, model)
-        answer = result["answer"] if result.get("answer") is not None else ""
-        sources = result.get("sources", [])
-        suggested_questions = result.get("suggested_questions", [])
-        
-        # Đảm bảo luôn có câu hỏi gợi ý khi không tìm thấy thông tin
-        if answer and "Không có thông tin liên quan trong tài liệu." in answer and not suggested_questions:
-            # Tạo câu hỏi gợi ý từ Gemini nếu không có
-            suggested_questions = generate_similar_questions(question, global_metadata)
-            logger.info(f"Tạo câu hỏi gợi ý từ Gemini: {suggested_questions}")
-        
-        # Nếu là AJAX request, chỉ trả về phần tin nhắn bot
-        if is_ajax:
-            logger.info(f"Returning AJAX response with answer length: {len(answer)}")
-            
-            # Tạo HTML cho câu hỏi gợi ý nếu có
-            suggested_questions_html = ""
-            if "Không có thông tin liên quan trong tài liệu." in answer:
-                # Kiểm tra xem suggested_questions có phải là dict không (trường hợp nhiều câu hỏi)
-                if isinstance(suggested_questions, dict):
-                    # Xử lý trường hợp nhiều câu hỏi - chỉ hiển thị gợi ý cho câu hỏi không có thông tin
-                    for q, suggestions in suggested_questions.items():
-                        if suggestions:
-                            suggested_questions_html += f"""
-                            <div class="suggested-questions">
-                                <p class="suggested-questions-title">Gợi ý cho câu hỏi "{q}":</p>
-                                <div class="space-y-2">
-                            """
-                            for suggestion in suggestions:
-                                # Escape dấu nháy đơn trong câu hỏi để tránh lỗi JavaScript
-                                escaped_suggestion = suggestion.replace("'", "\\'")
-                                suggested_questions_html += f"""
-                                    <button onclick="submitQuestion('{escaped_suggestion}')" 
-                                            class="suggested-question-btn">
-                                        {suggestion}
-                                    </button>
-                                """
-                            suggested_questions_html += """
-                                </div>
-                            </div>
-                            """
-                # Trường hợp một câu hỏi đơn
-                elif suggested_questions:
-                    suggested_questions_html = """
-                    <div class="suggested-questions">
-                        <p class="suggested-questions-title">Bạn có thể quan tâm đến các câu hỏi sau:</p>
-                        <div class="space-y-2">
-                    """
-                    for question in suggested_questions:
-                        # Escape dấu nháy đơn trong câu hỏi để tránh lỗi JavaScript
-                        escaped_question = question.replace("'", "\\'")
-                        suggested_questions_html += f"""
-                            <button onclick="submitQuestion('{escaped_question}')" 
-                                    class="suggested-question-btn">
-                                {question}
-                            </button>
-                        """
-                    suggested_questions_html += """
-                        </div>
-                    </div>
-                    """
-            
-            return render_template_string(
-                """<div class="chat-message bot-message"><div class="text-gray-800 dark:text-gray-200 whitespace-pre-wrap text-sm sm:text-base" style="display: inline;">{{ answer }}</div>{{ suggested_questions_html | safe }}</div>""", 
-                answer=answer,
-                suggested_questions_html=suggested_questions_html
-            )
-        else:
-            # Nếu không phải AJAX, trả về toàn bộ trang
-            return render_template_string(
-                index_html,
-                files=global_all_files,
-                settings=load_settings(),
-                answer=answer,
-                sources=sources,
-                question=question,
-                suggested_questions=suggested_questions if "Không có thông tin liên quan trong tài liệu." in answer else []
-            )
-            
+        answer, sources = answer_question(question, top_k, threshold, model)
     except Exception as e:
         error_message = str(e)
         logger.error(f"Lỗi khi trả lời câu hỏi: {error_message}")
         
-        if is_ajax:
-            logger.info("Returning AJAX error response")
-            return render_template_string(
-                """<div class="chat-message bot-message"><p class="text-red-500 dark:text-red-400 text-sm sm:text-base">Đã xảy ra lỗi khi xử lý yêu cầu của bạn: {{ error }}</p></div>""", error=error_message
-            )
+        # Xử lý lỗi token length
+        if "Token indices sequence length is longer than the specified maximum sequence length" in error_message:
+            # Giảm top_k và thử lại
+            reduced_top_k = max(3, top_k // 3)
+            logger.info(f"Giảm top_k từ {top_k} xuống {reduced_top_k} và thử lại")
+            
+            try:
+                answer, sources = answer_question(question, reduced_top_k, threshold, model)
+            except Exception as e2:
+                error_message = str(e2)
+                logger.error(f"Vẫn lỗi sau khi giảm top_k: {error_message}")
+                
+                if is_ajax:
+                    logger.info("Returning AJAX error response")
+                    return render_template_string(
+                        """
+                        <div class="chat-message bot-message">
+                            <p class="text-red-500 dark:text-red-400 text-sm sm:text-base">Đã xảy ra lỗi khi xử lý yêu cầu của bạn: {{ error }}</p>
+                        </div>
+                        """, error=error_message
+                    )
+                else:
+                    return render_template_string(
+                        index_html,
+                        files=global_all_files,
+                        settings=load_settings(),
+                        answer=f"Đã xảy ra lỗi khi xử lý yêu cầu của bạn: {error_message}",
+                        sources=[]
+                    )
         else:
-            return render_template_string(
-                index_html,
-                files=global_all_files,
-                settings=load_settings(),
-                answer=f"Đã xảy ra lỗi khi xử lý yêu cầu của bạn: {error_message}",
-                sources=[],
-                suggested_questions=[]
-            )
+            if is_ajax:
+                logger.info("Returning AJAX error response")
+                return render_template_string(
+                    """
+                    <div class="chat-message bot-message">
+                        <p class="text-red-500 dark:text-red-400 text-sm sm:text-base">Đã xảy ra lỗi khi xử lý yêu cầu của bạn: {{ error }}</p>
+                    </div>
+                    """, error=error_message
+                )
+            else:
+                return render_template_string(
+                    index_html,
+                    files=global_all_files,
+                    settings=load_settings(),
+                    answer=f"Đã xảy ra lỗi khi xử lý yêu cầu của bạn: {error_message}",
+                    sources=[]
+                )
+    
+    # Nếu là AJAX request, chỉ trả về phần tin nhắn bot
+    if is_ajax:
+        logger.info(f"Returning AJAX response with answer length: {len(answer)}")
+        return render_template_string(
+            """
+            <div class="chat-message bot-message">
+                <div class="text-gray-800 dark:text-gray-200 whitespace-pre-wrap text-sm sm:text-base">{{ answer }}</div>
+            </div>
+            """, answer=answer
+        )
+    else:
+        # Nếu không phải AJAX, trả về toàn bộ trang
+        return render_template_string(
+            index_html,
+            files=global_all_files,
+            settings=load_settings(),
+            answer=answer,
+            sources=sources,
+            question=question
+        )
 
 # Route cho upload file
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """
-    Xử lý tải lên tài liệu
-    """
-    # Sử dụng phiên bản nâng cao của hàm upload_file để hỗ trợ xác thực và phân chia theo người dùng
-    from supabase_integration import enhanced_upload_file
-    return enhanced_upload_file(
-        upload_folder, 
+    # Lấy phương pháp chunking từ form
+    chunking_method = request.form.get('chunking_method', 'sentence_windows')
+    
+    # Kiểm tra xem có file được gửi lên không
+    if 'file[]' not in request.files:
+        return render_template_string(
             index_html,
-        global_all_files, 
-        load_settings, 
-        extract_text_pdf, 
-        extract_text_docx, 
-        extract_text_txt, 
-        add_document, 
-        save_state
+            files=global_all_files,
+            settings=load_settings(),
+            upload_result="Không có file nào được chọn.",
+            answer=None,
+            sources=None
+        )
+    
+    files = request.files.getlist('file[]')
+    
+    # Nếu không có file nào được chọn
+    if len(files) == 0 or files[0].filename == '':
+        return render_template_string(
+            index_html,
+            files=global_all_files,
+            settings=load_settings(),
+            upload_result="Không có file nào được chọn.",
+            answer=None,
+            sources=None
+        )
+    
+    # Định dạng file được phép
+    allowed_extensions = {'txt', 'pdf', 'docx'}
+    
+    # Biến lưu kết quả xử lý
+    processed_files = []
+    failed_files = []
+    total_chunks = 0
+    
+    # Xử lý từng file
+    for file in files:
+        # Kiểm tra phần mở rộng file
+        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        
+        if file_ext not in allowed_extensions:
+            failed_files.append(f"{file.filename} (định dạng không được hỗ trợ)")
+            continue
+        
+        try:
+            # Lưu file
+            filename = file.filename
+            file_path = os.path.join(upload_folder, filename)
+            file.save(file_path)
+            
+            # Trích xuất văn bản từ file
+            text = ""
+            if file_ext == 'pdf':
+                text = extract_text_pdf(file_path)
+            elif file_ext == 'docx':
+                text = extract_text_docx(file_path)
+            elif file_ext == 'txt':
+                text = extract_text_txt(file_path)
+            
+            # Kiểm tra xem text có phải là chuỗi không
+            if not isinstance(text, str):
+                logger.error(f"Lỗi: text không phải là chuỗi mà là {type(text)}")
+                if isinstance(text, list):
+                    text = "\n".join(text)
+                else:
+                    text = str(text) if text is not None else ""
+            
+            # Thêm tài liệu vào hệ thống RAG
+            chunk_count = add_document(text, filename, chunking_method)
+            total_chunks += chunk_count
+            processed_files.append(filename)
+            
+        except Exception as e:
+            logger.error(f"Lỗi khi xử lý file {file.filename}: {str(e)}")
+            failed_files.append(f"{file.filename} (lỗi: {str(e)})")
+    
+    # Lưu trạng thái
+    save_state()
+    
+    # Tạo thông báo kết quả
+    if len(processed_files) > 0 and len(failed_files) == 0:
+        if len(processed_files) == 1:
+            result_message = f"Đã tải lên và xử lý thành công file {processed_files[0]} với {total_chunks} chunks."
+        else:
+            result_message = f"Đã tải lên và xử lý thành công {len(processed_files)} file với tổng cộng {total_chunks} chunks."
+    elif len(processed_files) > 0 and len(failed_files) > 0:
+        result_message = f"Đã xử lý {len(processed_files)} file thành công với {total_chunks} chunks. {len(failed_files)} file thất bại: {', '.join(failed_files)}"
+    else:
+        result_message = f"Không thể xử lý file: {', '.join(failed_files)}"
+    
+    # Kiểm tra nếu request là AJAX (có header X-Requested-With)
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    
+    if is_ajax:
+        # Trả về JSON nếu là AJAX request
+        return jsonify({
+            'success': len(processed_files) > 0,
+            'message': result_message,
+            'files': global_all_files
+        })
+    else:
+        # Trả về HTML như bình thường
+        return render_template_string(
+            index_html,
+            files=global_all_files,
+            settings=load_settings(),
+            upload_result=result_message,
+            answer=None,
+            sources=None
         )
 
 # Route cho xóa file
 @app.route('/remove', methods=['POST'])
 def remove_file():
-    """
-    Xử lý xóa tài liệu
-    """
-    # Sử dụng phiên bản nâng cao của hàm remove_file để hỗ trợ xác thực và phân chia theo người dùng
-    from supabase_integration import enhanced_remove_file
-    return enhanced_remove_file(index_html, global_all_files, load_settings, remove_document)
+    filename = request.form.get('filename')
+    if not filename:
+        return render_template_string(
+            index_html,
+            files=global_all_files,
+            settings=load_settings(),
+            upload_result="Lỗi: Không có tên tài liệu được cung cấp.",
+            answer=None,
+            sources=None
+        )
+    
+    if filename not in global_all_files:
+        return render_template_string(
+            index_html,
+            files=global_all_files,
+            settings=load_settings(),
+            upload_result=f"Lỗi: Không tìm thấy tài liệu '{filename}' trong hệ thống.",
+            answer=None,
+            sources=None
+        )
+    
+    try:
+        success, message = remove_document(filename)
+        
+        if not success:
+            return render_template_string(
+                index_html,
+                files=global_all_files,
+                settings=load_settings(),
+                upload_result=f"Lỗi khi xóa tài liệu: {message}",
+                answer=None,
+                sources=None
+            )
+        
+        return render_template_string(
+            index_html,
+            files=global_all_files,
+            settings=load_settings(),
+            upload_result=message,
+            answer=None,
+            sources=None
+        )
+    except Exception as e:
+        logger.error(f"Lỗi khi xóa tài liệu '{filename}': {str(e)}")
+        return render_template_string(
+            index_html,
+            files=global_all_files,
+            settings=load_settings(),
+            upload_result=f"Đã xảy ra lỗi khi xóa tài liệu: {str(e)}",
+            answer=None,
+            sources=None
+        )
 
 # Route cho lưu cài đặt
 @app.route('/settings', methods=['POST'])
 def save_settings():
-    """
-    Xử lý lưu cài đặt hệ thống
-    """
-    # Yêu cầu đăng nhập trước khi thay đổi cài đặt
-    from supabase_modules.auth import verify_session
-    if not verify_session():
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({"error": "Unauthorized", "message": "Vui lòng đăng nhập để thay đổi cài đặt"}), 401
-        else:
-            flash("Vui lòng đăng nhập để thay đổi cài đặt", "error")
-            return redirect(url_for('login'))
-    
-    # Nạp trạng thái hệ thống của người dùng đã đăng nhập
-    load_state()
-    
     # Lấy các cài đặt từ form
     settings = {
         "sentence_windows": {
@@ -4194,497 +3313,9 @@ def save_settings():
 
 # --- Khởi động server và ngrok ---
 from pyngrok import ngrok
-
-# Hàm tự động tải lại dữ liệu khi khởi động
-def initialize_system():
-    """
-    Khởi tạo hệ thống và tải lại dữ liệu khi khởi động
-    
-    Hàm này kiểm tra xem các file cần thiết đã tồn tại hay chưa và tải lại dữ liệu
-    từ các file đã lưu.
-    """
-    global global_metadata, global_all_files, global_vector_list, faiss_index, tfidf_vectorizer, tfidf_matrix
-    
-    # Kiểm tra và tạo thư mục uploads nếu chưa có
-    os.makedirs(upload_folder, exist_ok=True)
-    
-    # Tải dữ liệu dựa trên người dùng đăng nhập
-    success = load_state()
-    
-    if not success:
-        logger.info("Không tìm thấy dữ liệu hiện có, khởi tạo hệ thống mới")
-        
-        # Khởi tạo biến global - phải khởi tạo đúng kiểu dữ liệu
-        global_metadata = []  # Danh sách metadata
-        global_all_files = {}  # Dictionary tài liệu, key là tên file
-        global_vector_list = []
-        
-        # Khởi tạo index FAISS
-        initialize_faiss_index()
-        
-        # Khởi tạo TF-IDF
-        initialize_tfidf()
-        
-        # Lưu trạng thái
-        save_state()
-    
-    logger.info(f"Hệ thống đã được khởi tạo với {len(global_all_files)} tài liệu")
-
-def identify_most_relevant_pages(answer, retrieved_chunks, retrieved_metadata):
-    """
-    Xác định chính xác trang bắt đầu của câu trả lời
-    
-    Phân tích câu trả lời để tìm trang bắt đầu chứa thông tin liên quan,
-    thay vì liệt kê tất cả các trang.
-    
-    Args:
-        answer (str): Câu trả lời được tạo bởi LLM
-        retrieved_chunks (list): Danh sách các đoạn văn bản được truy xuất
-        retrieved_metadata (list): Metadata tương ứng với các chunks
-        
-    Returns:
-        dict: Từ điển với khóa là filename và giá trị là trang bắt đầu của câu trả lời
-    """
-    # Tách câu trả lời thành các câu riêng biệt và loại bỏ thẻ trang
-    clean_answer = re.sub(r'\[Trang \d+\]\s*', '', answer)
-    
-    # Tách thành các câu và đoạn văn
-    paragraphs = clean_answer.split('\n\n')
-    all_sentences = []
-    
-    # Tách câu trả lời thành câu và sắp xếp theo thứ tự xuất hiện trong câu trả lời
-    for para in paragraphs:
-        if not para.strip():
-            continue
-        sentences = re.split(r'(?<=[.!?])\s+', para)
-        all_sentences.extend(s.strip() for s in sentences if len(s.strip()) > 20)
-    
-    # Loại bỏ trùng lặp nhưng giữ thứ tự ban đầu
-    unique_sentences = []
-    seen = set()
-    for s in all_sentences:
-        if s not in seen and len(s) > 20:
-            seen.add(s)
-            unique_sentences.append(s)
-    
-    # Dictionary lưu trang bắt đầu cho mỗi file
-    start_pages = {}
-    # Dictionary lưu các câu đã tìm thấy trong mỗi file
-    found_sentences = defaultdict(list)
-    # Dictionary lưu vị trí đầu tiên của mỗi câu trong câu trả lời
-    first_positions = {}
-    
-    # Tìm vị trí xuất hiện đầu tiên của mỗi câu trong tất cả các chunks
-    for sentence_idx, sentence in enumerate(unique_sentences):
-        # Lưu vị trí câu trong câu trả lời - ưu tiên câu xuất hiện sớm hơn
-        first_positions[sentence] = sentence_idx
-        
-        for chunk_idx, chunk in enumerate(retrieved_chunks):
-            if chunk_idx >= len(retrieved_metadata):
-                continue
-                
-            metadata = retrieved_metadata[chunk_idx]
-            filename = metadata.get('filename', 'Unknown')
-            
-            # Loại bỏ thẻ trang để so sánh nội dung
-            clean_chunk = re.sub(r'\[Trang \d+\]\s*', '', chunk)
-            
-            # Kiểm tra xem câu có trong chunk không
-            if sentence in clean_chunk:
-                # Lấy số trang từ chunk
-                page_markers = re.findall(r'\[Trang (\d+)\]', chunk)
-                
-                # Ưu tiên sử dụng trang từ metadata nếu có
-                if "primary_page" in metadata and metadata["primary_page"] is not None:
-                    page = str(metadata["primary_page"])
-                elif page_markers:
-                    page = page_markers[0]  # Lấy trang đầu tiên trong chunk
-                else:
-                    continue  # Không tìm thấy trang
-                
-                # Lưu sentence vào found_sentences với vị trí câu trong câu trả lời
-                found_sentences[filename].append((sentence, int(page), sentence_idx))
-                
-                # Đã tìm thấy câu này trong chunk này, không cần kiểm tra tiếp các chunk khác
-                break
-    
-    # Xác định trang bắt đầu cho mỗi file dựa trên các câu đã tìm thấy
-    for filename, sentences in found_sentences.items():
-        if not sentences:
-            continue
-        
-        # Sắp xếp các câu theo vị trí xuất hiện trong câu trả lời (câu đầu tiên là quan trọng nhất)
-        sorted_sentences = sorted(sentences, key=lambda x: x[2])
-        
-        # Lấy trang của câu đầu tiên làm trang bắt đầu
-        if sorted_sentences:
-            start_pages[filename] = str(sorted_sentences[0][1])
-    
-    # Nếu không tìm thấy trang nào, thử phương pháp dựa trên từ khóa
-    if not start_pages:
-        return _identify_pages_by_keywords_start(unique_sentences, retrieved_chunks, retrieved_metadata)
-    
-    # Chuyển đổi thành định dạng tương thích với phần còn lại của code
-    result = {}
-    for filename, page in start_pages.items():
-        result[filename] = {page}
-    
-    return result
-
-def _identify_pages_by_keywords_start(sentences, retrieved_chunks, retrieved_metadata):
-    """
-    Phương pháp dự phòng để xác định trang bắt đầu dựa trên từ khóa trong câu trả lời
-    
-    Args:
-        sentences (list): Các câu trong câu trả lời
-        retrieved_chunks (list): Các đoạn văn bản được truy xuất
-        retrieved_metadata (list): Metadata tương ứng
-        
-    Returns:
-        dict: Từ điển với khóa là filename và giá trị là tập hợp chứa trang bắt đầu
-    """
-    # Trích xuất các từ khóa từ các câu đầu tiên (quan trọng nhất)
-    important_keywords = set()
-    for sentence in sentences[:3]:  # Chỉ xem xét 3 câu đầu tiên
-        words = sentence.split()
-        # Sử dụng độ dài từ để lọc các từ ngắn
-        keywords = [w for w in words if len(w) > 4]
-        important_keywords.update(keywords)
-    
-    # Trích xuất thêm từ khóa từ các câu còn lại
-    all_keywords = important_keywords.copy()
-    for sentence in sentences[3:]:  # Các câu tiếp theo
-        words = sentence.split()
-        keywords = [w for w in words if len(w) > 4]
-        all_keywords.update(keywords)
-    
-    # Lưu trữ điểm số cho từng trang của mỗi file
-    file_pages = {}
-    page_scores = defaultdict(lambda: defaultdict(int))
-    
-    # Tìm các từ khóa trong các chunks
-    for idx, chunk in enumerate(retrieved_chunks):
-        if idx >= len(retrieved_metadata):
-            continue
-            
-        metadata = retrieved_metadata[idx]
-        filename = metadata.get('filename', 'Unknown')
-        
-        # Lấy thông tin trang
-        if "primary_page" in metadata and metadata["primary_page"] is not None:
-            page = str(metadata["primary_page"])
-        else:
-            page_markers = re.findall(r'\[Trang (\d+)\]', chunk)
-            if not page_markers:
-                continue
-            page = page_markers[0]  # Lấy trang đầu tiên
-        
-        # Tính điểm dựa trên số lượng từ khóa quan trọng trùng khớp
-        important_matches = sum(1 for keyword in important_keywords if keyword in chunk)
-        all_matches = sum(1 for keyword in all_keywords if keyword in chunk)
-        
-        # Trang có nhiều từ khóa quan trọng nhất có khả năng cao là trang bắt đầu
-        page_scores[filename][page] = important_matches * 3 + all_matches
-        
-        # Lưu trang vào file_pages
-        if filename not in file_pages:
-            file_pages[filename] = set()
-        file_pages[filename].add(page)
-    
-    # Chọn trang có điểm cao nhất cho mỗi file làm trang bắt đầu
-    start_pages = {}
-    for filename, pages in file_pages.items():
-        if not pages:
-            continue
-            
-        # Tìm trang có điểm cao nhất
-        best_page = max(pages, key=lambda p: page_scores[filename][p])
-        start_pages[filename] = {best_page}
-    
-    return start_pages
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    """
-    Xử lý đăng nhập người dùng
-    """
-    if verify_session():
-        return redirect(url_for('index'))
-        
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        
-        if not email or not password:
-            flash('Vui lòng nhập đầy đủ thông tin', 'error')
-            return render_template('login.html')
-        
-        success, message, user_data = login_user(email, password)
-        
-        if success:
-            flash(message, 'success')
-            
-            # Nếu có localStorage data trong form, chuyển đến khởi tạo dữ liệu người dùng
-            if request.form.get('chat_history_json'):
-                return redirect(url_for('init_user_data'))
-            
-            return redirect(url_for('index'))
-        else:
-            flash(message, 'error')
-    
-    return render_template('login.html')
-
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    """
-    Xử lý đăng ký người dùng mới
-    """
-    if verify_session():
-        return redirect(url_for('index'))
-        
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        
-        if not email or not password or not confirm_password:
-            flash('Vui lòng nhập đầy đủ thông tin', 'error')
-            return render_template('register.html')
-            
-        if password != confirm_password:
-            flash('Mật khẩu và xác nhận mật khẩu không khớp', 'error')
-            return render_template('register.html')
-        
-        success, message = register_user(email, password)
-        
-        if success:
-            flash(message, 'success')
-            return redirect(url_for('login'))
-        else:
-            flash(message, 'error')
-    
-    return render_template('register.html')
-
-@app.route('/logout')
-def logout():
-    """
-    Đăng xuất người dùng hiện tại
-    """
-    if logout_user():
-        flash('Đăng xuất thành công', 'success')
-    return redirect(url_for('login'))
-
-@app.route('/profile', methods=['GET'])
-@require_auth
-def profile():
-    """
-    Hiển thị trang hồ sơ người dùng
-    """
-    user = get_current_user()
-    if not user:
-        return redirect(url_for('login'))
-    
-    # Lấy danh sách file của người dùng
-    files = get_user_files_with_metadata(user['id'])
-    
-    return render_template('profile.html', user=user, files=files)
-
-@app.route('/change-password', methods=['POST'])
-@require_auth
-def change_pwd():
-    """
-    Xử lý thay đổi mật khẩu
-    """
-    user = get_current_user()
-    if not user:
-        return redirect(url_for('login'))
-    
-    current_password = request.form.get('current_password')
-    new_password = request.form.get('new_password')
-    confirm_new_password = request.form.get('confirm_new_password')
-    
-    if not current_password or not new_password or not confirm_new_password:
-        flash('Vui lòng nhập đầy đủ thông tin', 'error')
-        return redirect(url_for('profile'))
-        
-    if new_password != confirm_new_password:
-        flash('Mật khẩu mới và xác nhận mật khẩu mới không khớp', 'error')
-        return redirect(url_for('profile'))
-    
-    success, message = change_password(user['id'], current_password, new_password)
-    
-    if success:
-        flash(message, 'success')
-    else:
-        flash(message, 'error')
-        
-    return redirect(url_for('profile'))
-
-@app.route('/forgot-password', methods=['GET', 'POST'])
-def forgot_password():
-    """
-    Xử lý yêu cầu đặt lại mật khẩu
-    """
-    if verify_session():
-        return redirect(url_for('index'))
-        
-    if request.method == 'POST':
-        email = request.form.get('email')
-        
-        if not email:
-            flash('Vui lòng nhập địa chỉ email', 'error')
-            return render_template('forgot_password.html')
-        
-        success, message = reset_password_request(email)
-        
-        if success:
-            flash(message, 'success')
-        else:
-            flash(message, 'error')
-    
-    return render_template('forgot_password.html')
-
-@app.route('/init-user-data', methods=['POST'])
-@require_auth
-def init_user_data():
-    """
-    Khởi tạo dữ liệu người dùng (di chuyển từ localStorage sang Supabase)
-    """
-    user = get_current_user()
-    if not user:
-        return redirect(url_for('login'))
-    
-    # Lấy dữ liệu từ form
-    chat_history_json = request.form.get('chat_history_json', '{}')
-    
-    # Khởi tạo dữ liệu người dùng
-    result = initialize_user_data(user['id'], chat_history_json)
-    
-    if result['success']:
-        flash(f"Khởi tạo dữ liệu thành công! Đã di chuyển {result['migrated_chats']} cuộc trò chuyện và {result['migrated_files']} tệp tin.", 'success')
-    else:
-        flash(f"Có lỗi xảy ra khi khởi tạo dữ liệu: {result['message']}", 'error')
-    
-    return redirect(url_for('index'))
-
-@app.route('/delete-file', methods=['POST'])
-@require_auth
-def delete_user_file_route():
-    """
-    Xóa file của người dùng
-    """
-    user = get_current_user()
-    if not user:
-        return redirect(url_for('login'))
-    
-    file_id = request.form.get('file_id')
-    if not file_id:
-        flash('Thiếu thông tin file cần xóa', 'error')
-        return redirect(url_for('profile'))
-    
-    success = delete_user_file(user['id'], file_id)
-    
-    if success:
-        flash('Đã xóa file thành công', 'success')
-    else:
-        flash('Có lỗi xảy ra khi xóa file', 'error')
-    
-    return redirect(url_for('profile'))
-
-# --- Hàm khởi tạo indices ---
-def initialize_faiss_index():
-    """
-    Khởi tạo FAISS index mới
-    """
-    global faiss_index
-    
-    # Khởi tạo FAISS index nếu chưa có
-    if faiss_index is None:
-        # Tạo index với metric=L2 (Euclidean distance) và kích thước vector 768 (mặc định cho embedding model)
-        faiss_index = faiss.IndexFlatL2(768)  
-        logger.info(f"Đã khởi tạo FAISS index mới")
-
-def initialize_tfidf():
-    """
-    Khởi tạo TF-IDF vectorizer và matrix mới
-    """
-    global tfidf_vectorizer, tfidf_matrix
-    
-    # Khởi tạo TF-IDF vectorizer mới nếu chưa có
-    if tfidf_vectorizer is None:
-        tfidf_vectorizer = TfidfVectorizer(ngram_range=(1, 2), stop_words='english')
-        tfidf_matrix = None
-        logger.info(f"Đã khởi tạo TF-IDF vectorizer mới")
-
-# Thiết lập routes xác thực
-# setup_auth_routes(app)
-# Thiết lập routes xác thực chính
-# setup_auth_routes_main = supabase_integration.setup_auth_routes
-# setup_auth_routes_main(app)
-# Chỉ sử dụng một cách đăng ký auth routes để tránh trùng lặp
-from supabase_modules.auth import setup_auth_routes as setup_auth_routes_status
-setup_auth_routes_status(app)
-
-# Thiết lập các route API cho chat history và tương tác với Supabase
-from supabase_integration import setup_chat_routes
-setup_chat_routes(app)
-
-# Thêm route riêng để kiểm tra kết nối Supabase
-@app.route('/api/supabase-check', methods=['GET'])
-def check_supabase_connection():
-    """
-    Kiểm tra kết nối với Supabase
-    """
-    from supabase_modules.config import get_supabase_client
-    import json
-    
-    supabase = get_supabase_client()
-    results = {
-        "connection": False,
-        "chats_table": False,
-        "messages_table": False,
-        "auth": False,
-        "details": {}
-    }
-    
-    try:
-        # Kiểm tra kết nối và bảng chats
-        chats_query = supabase.table("chats").select("*").limit(5).execute()
-        results["connection"] = True
-        results["chats_table"] = True
-        results["details"]["chats"] = f"Found {len(chats_query.data or [])} records"
-        
-        # Kiểm tra bảng messages
-        messages_query = supabase.table("messages").select("*").limit(5).execute()
-        results["messages_table"] = True
-        results["details"]["messages"] = f"Found {len(messages_query.data or [])} records"
-        
-        # Kiểm tra xác thực
-        from supabase_modules.auth import verify_session, get_current_user
-        user = get_current_user()
-        results["auth"] = user is not None
-        results["details"]["auth"] = "Logged in as " + user["email"] if user else "Not logged in"
-        
-        return jsonify(results)
-    except Exception as e:
-        results["details"]["error"] = str(e)
-        logger.error(f"Lỗi khi kiểm tra kết nối Supabase: {str(e)}")
-        return jsonify(results), 500
-
-@app.route('/clear-flash-messages', methods=['POST'])
-def clear_flash_messages():
-    """
-    Xóa flash messages khỏi session
-    """
-    session.pop('_flashes', None)
-    return '', 204
-
 if __name__ == "__main__":
-    # Khởi tạo hệ thống và tải lại dữ liệu
-    initialize_system()
-    
-    # logger.info("Khởi tạo kết nối với ngrok và khởi động server Flask")
-    # ngrok.set_auth_token(os.getenv("NGROK_AUTH_TOKEN"))  # Lấy token từ biến môi trường
-    # public_url = ngrok.connect(int(os.getenv("PORT", 5000)))
-    # print("Public URL:", public_url)
+    logger.info("Khởi tạo kết nối với ngrok và khởi động server Flask")
+    ngrok.set_auth_token(os.getenv("NGROK_AUTH_TOKEN"))  # Lấy token từ biến môi trường
+    public_url = ngrok.connect(int(os.getenv("PORT", 5000)))
+    print("Public URL:", public_url)
     app.run()

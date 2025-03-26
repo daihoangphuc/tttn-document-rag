@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Tailwind CSS và Flowbite -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.css" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
 
     <style>
@@ -128,10 +128,13 @@
         }
         
         @keyframes typing {
-            0%, 100% {
+
+            0%,
+            100% {
                 transform: translateY(0);
                 opacity: 0.5;
             }
+
             50% {
                 transform: translateY(-4px);
                 opacity: 1;
@@ -562,8 +565,9 @@
             /* Để tạo khoảng cách cho form câu hỏi */
             left: 0 !important;
             right: 0 !important;
-            padding: 5px !important;
-            background-color: #000000 !important;
+            padding: 1rem !important;
+            background-color: #ffffff !important;
+            overflow: hidden !important;
         }
 
         #chat-container>div {
@@ -707,9 +711,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            width: 40px !important; /* Đảm bảo luôn giữ chiều rộng */
+            height: 40px !important; /* Đảm bảo luôn giữ chiều cao */
+            min-width: 40px !important; /* Đặt min-width để không bị co lại */
+            min-height: 40px !important; /* Đặt min-height để không bị co lại */
+            border-radius: 50% !important; /* Đảm bảo luôn tròn */
+            padding: 0 !important; /* Loại bỏ padding có thể làm biến dạng */
+            aspect-ratio: 1/1; /* Đảm bảo tỷ lệ khung hình luôn là 1:1 */
             background: linear-gradient(135deg, #0078FF 0%, #00C6FF 100%);
             box-shadow: 0 2px 8px rgba(0, 120, 255, 0.3);
             color: white;
@@ -718,10 +726,11 @@
             cursor: pointer;
             transition: all 0.3s ease;
             transform-origin: center;
+            overflow: hidden; /* Đảm bảo nội dung không tràn ra ngoài */
         }
         
         .send-button:hover:not(:disabled) {
-            transform: scale(1.1);
+            /* Xóa transform: scale(1.1); để bỏ hiệu ứng scale khi hover */
             box-shadow: 0 4px 12px rgba(0, 120, 255, 0.4);
         }
         
@@ -736,25 +745,33 @@
             box-shadow: none;
         }
         
+        .send-button i,
         .send-button svg {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             transition: transform 0.3s ease;
+            font-size: 16px;
         }
         
-        .send-button:hover:not(:disabled) svg {
+        .send-button:hover:not(:disabled) svg,
+        .send-button:hover:not(:disabled) i {
             transform: translateX(2px);
         }
         
         @media (max-width: 640px) {
             .send-button {
-                width: 36px;
-                height: 36px;
+                width: 36px !important;
+                height: 36px !important;
+                min-width: 36px !important;
+                min-height: 36px !important;
+                right: 8px; /* Điều chỉnh vị trí để cân đối hơn trên mobile */
             }
             
+            .send-button i,
             .send-button svg {
-                width: 18px;
-                height: 18px;
+                width: 16px;
+                height: 16px;
+                font-size: 14px;
             }
         }
 
@@ -775,24 +792,209 @@
         }
 
         /* Đảm bảo các phần tử có thể cuộn */
-        .overflow-auto, .overflow-y-auto, .overflow-x-auto {
+        .overflow-auto,
+        .overflow-y-auto,
+        .overflow-x-auto {
             -webkit-overflow-scrolling: touch;
+        }
+
+        /* Thêm nút đồng bộ hóa lịch sử chat lên cơ sở dữ liệu */
+        #syncChatButton {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            z-index: 999;
+        }
+
+        /* Thêm nút tải lịch sử từ Supabase */
+        #loadChatButton {
+            position: fixed;
+            top: 20px;
+            right: 120px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            z-index: 999;
+        }
+
+        /* Thêm thông báo */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: -320px;
+            width: 300px;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+            transition: right 0.3s ease;
+            background-color: #fff;
+            color: #333;
+        }
+
+        .notification.show {
+            right: 20px;
+        }
+
+        .notification h4 {
+            margin: 0 0 10px;
+        }
+
+        .notification p {
+            margin: 0;
+        }
+
+        .notification .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #555;
+        }
+
+        .notification.success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .notification.error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .notification.warning {
+            background-color: #fff3cd;
+            border-color: #ffeeba;
+            color: #856404;
+        }
+
+        .notification.info {
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+            color: #0c5460;
+        }
+
+        /* Cải thiện nút toggle sidebar trong thanh navigation */
+        nav #toggleSidebar {
+            padding: 8px;
+            margin-right: 4px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        @media (max-width: 640px) {
+            /* Tối ưu kích thước nút trong nav */
+            nav #toggleSidebar {
+                padding: 6px;
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+            
+            /* Các styles khác giữ nguyên */
+            #chat-container {
+                padding: 5px !important;
+            }
+        }
+
+        /* CSS cho modal hồ sơ cá nhân */
+        #profileModal {
+            z-index: 1000;
+        }
+
+        #profileModal .relative {
+            margin: 1.75rem auto;
+        }
+
+        #profile-tabs button.active {
+            border-bottom-color: #3b82f6;
+            color: #3b82f6;
+        }
+
+        @media (min-width: 1024px) {
+            nav .flex.items-center.justify-start.rtl\:justify-end {
+                display: none;
+            }
         }
     </style>
 </head>
 
 <body class="bg-gray-50 dark:bg-gray-900">
-    <!-- Nút toggle sidebar -->
-    <button id="toggleSidebar" type="button"
-        class="fixed top-4 left-4 z-50 inline-flex items-center p-2 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600 lg:hidden">
-        <span class="sr-only">Mở sidebar</span>
-        <svg class="w-6 h-6" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20"
-            xmlns="http://www.w3.org/2000/svg">
-            <path clip-rule="evenodd" fill-rule="evenodd"
-                d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z">
-            </path>
-        </svg>
-    </button>
+    <!-- Navigation Bar -->
+    <nav class="fixed top-0 z-40 w-full bg-white border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700 h-12 lg:w-[calc(100%-16rem)] lg:left-64">
+        <div class="h-full px-3 lg:px-5 flex items-center justify-between">
+            <div class="flex items-center justify-start rtl:justify-end lg:hidden">
+                <button id="toggleSidebar" type="button"
+                    class="inline-flex items-center p-2 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:focus:ring-gray-600">
+                    <span class="sr-only">Mở sidebar</span>
+                    <svg class="w-6 h-6" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path clip-rule="evenodd" fill-rule="evenodd"
+                            d="M2 4.75A.75.75 0 012.75 4h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 4.75zm0 10.5a.75.75 0 01.75-.75h7.5a.75.75 0 010 1.5h-7.5a.75.75 0 01-.75-.75zM2 10a.75.75 0 01.75-.75h14.5a.75.75 0 010 1.5H2.75A.75.75 0 012 10z">
+                        </path>
+                    </svg>
+                </button>
+                <a href="/" class="flex items-center ml-2 lg:ml-0">
+                    <span class="self-center text-lg font-semibold sm:text-xl whitespace-nowrap dark:text-white">Chat RAG</span>
+                </a>
+            </div>
+            <div class="flex items-center ml-auto h-full">
+                <div class="flex items-center h-full">
+                    <div class="flex items-center h-full">
+                        <button type="button" class="flex items-center justify-center text-sm bg-gray-100 dark:bg-gray-600 rounded-full focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600 logged-in hidden" id="user-menu-button" aria-expanded="false" data-dropdown-toggle="user-dropdown" data-dropdown-placement="bottom">
+                            <span class="sr-only">Open user menu</span>
+                            <div class="w-8 h-8 rounded-full overflow-hidden">
+                                <img class="w-full h-full object-cover" src="https://flowbite.com/docs/images/people/profile-picture-5.jpg" alt="user photo">
+                            </div>
+                        </button>
+                    </div>
+                    <!-- Dropdown menu -->
+                    <div class="z-50 hidden my-4 text-base list-none bg-white divide-y divide-gray-100 rounded shadow dark:bg-gray-700 dark:divide-gray-600" id="user-dropdown">
+                        <div class="px-4 py-3" id="user-info">
+                            <span class="block text-sm text-gray-900 dark:text-white" id="user-name">Người dùng</span>
+                            <span class="block text-sm text-gray-500 truncate dark:text-gray-400" id="user-email">name@example.com</span>
+                        </div>
+                        <ul class="py-1" aria-labelledby="user-menu-button">
+                            <li>
+                                <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white" id="profile-modal-btn" data-modal-target="profileModal" data-modal-toggle="profileModal">Hồ sơ</a>
+                            </li>
+                            <li>
+                                <a href="#" id="logout-btn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white">Đăng xuất</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="flex items-center ms-2 not-logged-in h-full">
+                        <a href="/login" class="text-sm text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-500 me-2">Đăng nhập</a>
+                        <a href="/register" class="text-sm text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg px-3 py-1.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Đăng ký</a>
+                </div>
+            </div>
+        </div>
+    </nav>
 
     <!-- Sidebar -->
     <aside id="sidebar"
@@ -812,14 +1014,6 @@
                             clip-rule="evenodd"></path>
                     </svg>
                 </button>
-                <!-- Nút thu nhỏ/mở rộng sidebar
-                <div id="sidebar-expander" class="sidebar-expander lg:flex" title="Thu nhỏ sidebar">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7">
-                        </path>
-                    </svg>
-                </div> -->
             </div>
 
             <!-- Nội dung sidebar -->
@@ -1124,11 +1318,11 @@
     </div>
 
     <!-- Khu vực chính (Main content) -->
-    <div class="p-2 sm:p-4 lg:ml-64 min-h-screen flex flex-col relative">
+    <div class="p-2 sm:p-4 lg:ml-64 min-h-screen flex flex-col relative mt-12">
         <div class="p-2 sm:p-4 bg-white rounded-lg dark:bg-gray-800 mb-4 flex-1 flex flex-col">
-            <h1 class="ml-10 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white md:hidden">
+            <!-- <h1 class="ml-10 text-xl sm:text-2xl font-bold text-gray-900 dark:text-white md:hidden">
                 RAG System
-            </h1>
+            </h1> -->
 
             <!-- Khu vực chat -->
             <div class="flex flex-col flex-1 relative">
@@ -1177,14 +1371,16 @@
                         <input type="hidden" name="model" id="form-model" value="gemini-2.0-flash">
                         <input type="hidden" name="top_k" id="form-top_k" value="15">
                         <input type="hidden" name="threshold" id="form-threshold" value="0.5">
-                        <input type="text" name="question" id="question"
-                            style="border-radius: 50px;"
-                            class="block w-full p-3 sm:p-4 pr-14 text-sm text-gray-900 bg-white border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                            placeholder="Nhập câu hỏi của bạn..." value="{{ request.form.get('question', '') }}" oninput="toggleSendButton()">
-                        <button type="submit" id="send-button" disabled
-                            class="send-button bg-blue-50 absolute inset-y-0 my-auto right-2">
-                            <i class="fa-solid fa-paper-plane"></i>
-                        </button>
+                        <input type="text" name="question" id="question" style="border-radius: 50px; padding-right: 48px;"
+                            class="block w-full p-3 sm:p-4 text-sm text-gray-900 bg-white border border-gray-300 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                            placeholder="Nhập câu hỏi của bạn..." value="{{ request.form.get('question', '') }}"
+                            oninput="toggleSendButton()">
+                        <div class="absolute top-0 bottom-0 right-2 flex items-center justify-center">
+                            <button type="submit" id="send-button" disabled
+                                class="send-button">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -1192,7 +1388,7 @@
     </div>
 
     <!-- Flowbite JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script>
 
     <!-- JavaScript cho các tính năng tương tác -->
     <script>
@@ -1353,71 +1549,116 @@
         });
 
         // Xử lý lịch sử chat
-        // Lưu trữ lịch sử chat trong localStorage
-        function saveChatHistory(chatId, title, messages, timestamp) {
-            // Lấy lịch sử chat hiện tại từ localStorage
-            let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
-
-            // Thêm chat mới hoặc cập nhật chat hiện có
-            const existingChatIndex = chatHistory.findIndex(chat => chat.id === chatId);
-
-            if (existingChatIndex !== -1) {
-                // Cập nhật chat hiện có
-                chatHistory[existingChatIndex] = {
+        // Hàm để tải lịch sử chat từ server
+        function loadChatHistoryFromServer() {
+            console.log('Đang tải lịch sử chat từ server...');
+            
+            fetch('/api/chat/history', {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Lỗi kết nối: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Dữ liệu trả về từ API chat/history:', data);
+                if (data.success) {
+                    if (data.chats && Array.isArray(data.chats)) {
+                        console.log('Đã tải lịch sử chat từ server thành công:', data.chats.length, 'cuộc trò chuyện');
+                        updateChatHistoryUI(data.chats);
+                        
+                        // Hiển thị thông báo
+                        const chatCount = data.chats.length;
+                        showNotification('Lịch sử chat', `Đã tải ${chatCount} cuộc trò chuyện từ cơ sở dữ liệu.`, 'success');
+                    } else if (data.chat_history && typeof data.chat_history === 'object') {
+                        // Convert chat_history object to array
+                        const chatsArray = Object.keys(data.chat_history).map(chatId => {
+                            const chat = data.chat_history[chatId];
+                            return {
                     id: chatId,
-                    title: title,
-                    messages: messages,
-                    timestamp: timestamp || new Date().toISOString()
-                };
-            } else {
-                // Thêm chat mới
-                chatHistory.push({
-                    id: chatId || Date.now().toString(),
-                    title: title || `Đoạn hội thoại ${chatHistory.length + 1}`,
-                    messages: messages || [],
-                    timestamp: timestamp || new Date().toISOString()
-                });
-            }
-
-            // Lưu lại vào localStorage
-            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-
-            // Cập nhật giao diện
-            updateChatHistoryUI();
-        }
-
-        // Lấy lịch sử chat từ localStorage
-        function getChatHistory() {
-            return JSON.parse(localStorage.getItem('chatHistory') || '[]');
-        }
-
-        // Xóa một đoạn chat từ lịch sử
-        function deleteChatHistory(chatId) {
-            let chatHistory = getChatHistory();
-            chatHistory = chatHistory.filter(chat => chat.id !== chatId);
-            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-            updateChatHistoryUI();
+                                title: chat.title || 'Cuộc trò chuyện không có tiêu đề',
+                                updated_at: chat.timestamp,
+                                created_at: chat.timestamp,
+                                last_message: chat.last_message || '',
+                                messages: chat.messages || []
+                            };
+                        });
+                        console.log('Đã chuyển đổi dữ liệu chat_history thành mảng:', chatsArray.length, 'cuộc trò chuyện');
+                        updateChatHistoryUI(chatsArray);
+                        
+                        // Hiển thị thông báo
+                        const chatCount = chatsArray.length;
+                        if (chatCount > 0) {
+                            showNotification('Lịch sử chat', `Đã tải ${chatCount} cuộc trò chuyện từ cơ sở dữ liệu.`, 'success');
+                        } else {
+                            showNotification('Lịch sử chat', 'Không có cuộc trò chuyện nào trong cơ sở dữ liệu.', 'info');
+                        }
+                    } else {
+                        console.error('Định dạng dữ liệu không hợp lệ:', data);
+                        showNotification('Lỗi', 'Định dạng dữ liệu lịch sử chat không hợp lệ.', 'error');
+                        
+                        // Hiển thị thông báo lỗi trong UI
+                        const chatHistoryList = document.getElementById('chat-history-list');
+                        if (chatHistoryList) {
+                            chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-red-500 dark:text-red-400">Định dạng dữ liệu không hợp lệ.</p>';
+                        }
+                    }
+                } else {
+                    console.error('Lỗi khi tải lịch sử chat từ server:', data.message);
+                    showNotification('Lỗi', 'Không thể tải lịch sử trò chuyện: ' + (data.message || 'Lỗi không xác định'), 'error');
+                    
+                    // Hiển thị thông báo lỗi trong UI
+                    const chatHistoryList = document.getElementById('chat-history-list');
+                    if (chatHistoryList) {
+                        chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-red-500 dark:text-red-400">Không thể tải lịch sử trò chuyện.</p>';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Lỗi kết nối khi tải lịch sử chat:', error);
+                showNotification('Lỗi', 'Không thể kết nối đến server. Vui lòng thử lại sau.', 'error');
+                
+                // Hiển thị thông báo lỗi trong UI
+                const chatHistoryList = document.getElementById('chat-history-list');
+                if (chatHistoryList) {
+                    chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-red-500 dark:text-red-400">Không thể kết nối đến máy chủ. Vui lòng thử lại sau.</p>';
+                }
+            });
         }
 
         // Cập nhật giao diện hiển thị lịch sử chat
-        function updateChatHistoryUI() {
+        function updateChatHistoryUI(chats) {
+            console.log('Cập nhật UI lịch sử chat...');
             const chatHistoryList = document.getElementById('chat-history-list');
-            const chatHistory = getChatHistory();
+            if (!chatHistoryList) {
+                console.error('Không tìm thấy phần tử #chat-history-list');
+                return;
+            }
 
             // Xóa nội dung hiện tại
             chatHistoryList.innerHTML = '';
 
-            if (chatHistory.length === 0) {
+            if (!chats || chats.length === 0) {
+                console.log('Không có cuộc hội thoại nào, hiển thị thông báo');
                 chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Chưa có đoạn hội thoại nào.</p>';
                 return;
             }
 
             // Sắp xếp lịch sử chat theo thời gian giảm dần (mới nhất lên đầu)
-            chatHistory.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            chats.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
 
             // Thêm các mục lịch sử chat vào danh sách
-            chatHistory.forEach(chat => {
-                const date = new Date(chat.timestamp);
+            chats.forEach(chat => {
+                if (!chat || !chat.id) {
+                    console.warn('Bỏ qua chat không hợp lệ:', chat);
+                    return; // Bỏ qua các chat không hợp lệ
+                }
+
+                try {
+                    const date = new Date(chat.updated_at || chat.created_at);
                 const formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}, ${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
 
                 const chatItem = document.createElement('div');
@@ -1426,7 +1667,7 @@
 
                 chatItem.innerHTML = `
                     <div class="truncate">
-                        <span class="flex-1 text-xs sm:text-sm">${chat.title}</span>
+                            <span class="flex-1 text-xs sm:text-sm">${chat.title || 'Cuộc trò chuyện không có tiêu đề'}</span>
                         <p class="text-xs text-gray-500 dark:text-gray-400">${formattedDate}</p>
                     </div>
                     <button type="button" class="delete-chat-btn text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400" data-chat-id="${chat.id}">
@@ -1435,6 +1676,7 @@
                 `;
 
                 chatHistoryList.appendChild(chatItem);
+                    console.log('Đã thêm chat item vào UI:', chat.id, chat.title);
 
                 // Thêm sự kiện click để tải lại đoạn chat
                 chatItem.addEventListener('click', function (e) {
@@ -1442,60 +1684,468 @@
                         loadChat(chat.id);
                     }
                 });
+                } catch (error) {
+                    console.error('Lỗi khi hiển thị chat item:', error, chat);
+                }
             });
 
-            // Thêm sự kiện xóa chat
+            // Thiết lập sự kiện cho các nút xóa
+            setupDeleteChatButtons();
+            console.log('Cập nhật UI lịch sử chat hoàn tất');
+        }
+
+        // Thiết lập sự kiện cho các nút xóa chat
+        function setupDeleteChatButtons() {
             document.querySelectorAll('.delete-chat-btn').forEach(button => {
                 button.addEventListener('click', function (e) {
                     e.stopPropagation();
                     const chatId = this.getAttribute('data-chat-id');
+                    const chatItem = this.closest('.chat-history-item');
 
                     if (confirm('Bạn có chắc chắn muốn xóa đoạn hội thoại này không?')) {
-                        deleteChatHistory(chatId);
+                        // Hiển thị loading trên button
+                        this.innerHTML = `
+                            <svg class="animate-spin w-3.5 h-3.5 sm:w-4 sm:h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        `;
+                        
+                        // Gửi yêu cầu xóa đến server
+                                    fetch(`/api/chat/${chatId}`, {
+                                        method: 'DELETE',
+                                        credentials: 'same-origin'
+                                    })
+                        .then(response => {
+                            if (response.ok) {
+                                // Xóa chat khỏi UI
+                                if (chatItem) {
+                                    chatItem.remove();
+                                }
+                                
+                                // Hiển thị thông báo thành công
+                                showNotification('Thành công', 'Đã xóa cuộc trò chuyện.', 'success');
+                                
+                                // Chuyển sang tab tài liệu nếu không còn chat nào
+                                const remainingChats = document.querySelectorAll('.chat-history-item');
+                                if (remainingChats.length === 0) {
+                                    const documentsTab = document.getElementById('documents-tab');
+                                    if (documentsTab) {
+                                        documentsTab.click();
+                                    }
+                                }
+                                
+                                // Nếu đang xem chat này, tạo một chat mới hoặc chuyển sang tab tài liệu
+                                if (currentChatId === chatId) {
+                                    // Nếu còn chat khác, tải chat đầu tiên
+                                    if (remainingChats.length > 0) {
+                                        const firstChatId = remainingChats[0].dataset.chatId;
+                                        loadChat(firstChatId);
+                                            } else {
+                                        // Không còn chat nào, xóa nội dung hiện tại
+                                        document.getElementById('chat-container').innerHTML = '';
+                                        // Chuyển sang tab tài liệu
+                                        const documentsTab = document.getElementById('documents-tab');
+                                        if (documentsTab) {
+                                            documentsTab.click();
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Khôi phục nút xóa
+                                this.innerHTML = `<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>`;
+                                
+                                // Hiển thị thông báo lỗi
+                                showNotification('Lỗi', 'Không thể xóa cuộc trò chuyện.', 'error');
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.error('Lỗi khi xóa chat:', error);
+                            // Khôi phục nút xóa
+                            this.innerHTML = `<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>`;
+                            showNotification('Lỗi', 'Không thể kết nối đến server. Vui lòng thử lại sau.', 'error');
+                        });
                     }
                 });
             });
         }
 
+        // Tải một đoạn chat
+        function loadChat(chatId) {
+            console.log('Đang tải chat ID:', chatId);
+            // Hiển thị thông báo đang tải
+            showNotification('Đang xử lý', 'Đang tải nội dung cuộc trò chuyện...', 'info');
+
+            // Tải messages của chat từ server
+            fetch(`/api/chat/${chatId}/messages`, {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.messages) {
+                    // Hiển thị tin nhắn
+                    displayChatMessages(chatId, data.messages);
+                    showNotification('Hoàn tất', 'Đã tải nội dung cuộc trò chuyện thành công.', 'success');
+                                } else {
+                    showNotification('Lỗi', 'Không thể tải tin nhắn cho cuộc trò chuyện này.', 'error');
+                                }
+                            })
+                            .catch(error => {
+                console.error('Lỗi khi tải tin nhắn:', error);
+                showNotification('Lỗi', 'Không thể tải tin nhắn. Vui lòng thử lại sau.', 'error');
+                            });
+        }
+
+        // Xóa một đoạn chat từ lịch sử local
+        function deleteChatHistoryLocal(chatId) {
+            let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+            
+            // Lọc bỏ chat có ID này
+            chatHistory = chatHistory.filter(chat => chat.id !== chatId);
+            
+            // Lưu lại vào localStorage
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            
+            // Cập nhật giao diện
+            updateChatHistoryUI();
+
+            // Nếu đang xem chat này, tạo một chat mới
+            const currentChatId = localStorage.getItem('currentChatId');
+            if (currentChatId === chatId) {
+                createNewChat();
+            }
+        }
+
+        // Hàm tải lịch sử chat từ localStorage
+        function loadChatHistory() {
+            const chatHistory = localStorage.getItem('chatHistory');
+            return chatHistory ? JSON.parse(chatHistory) : {};
+        }
+
         // Tải một đoạn chat từ lịch sử
         function loadChat(chatId) {
-            const chatHistory = getChatHistory();
-            const chat = chatHistory.find(c => c.id === chatId);
+            // Kiểm tra xem chatId có hợp lệ không
+            if (!chatId || typeof chatId !== 'string') {
+                console.error(`Chat ID không hợp lệ: ${chatId}`);
+                showNotification('Lỗi', 'Không thể tải cuộc trò chuyện. ID không hợp lệ.', 'error');
+                return;
+            }
 
-            if (!chat) return;
+            // Kiểm tra xem chatId có phải là UUID hợp lệ không
+            if (!isValidUUID(chatId)) {
+                console.error(`Chat ID không phải là UUID hợp lệ: ${chatId}`);
+                showNotification('Lỗi', 'Không thể tải cuộc trò chuyện. ID không đúng định dạng.', 'error');
+                return;
+            }
+
+            console.log(`Đang tải chat ID: ${chatId}`);
+
+            // Kiểm tra xem có trong localStorage không
+            const chatHistory = loadChatHistory();
+            const chat = chatHistory[chatId];
+
+            if (!chat) {
+                console.log(`Không tìm thấy chat ID ${chatId} trong localStorage, thử tải từ server...`);
+
+                // Hiển thị thông báo đang tải
+                showNotification('Đang xử lý', 'Đang tải nội dung cuộc trò chuyện...', 'info');
+
+                // Nếu không có trong localStorage, thử tải từ API
+                fetch('/api/auth/check', {
+                    method: 'GET',
+                    credentials: 'same-origin'
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.logged_in) {
+                            console.log(`Người dùng đã đăng nhập, tải messages cho chat ID ${chatId} từ server`);
+
+                            // Tải messages cho chat này từ API
+                            fetch(`/api/chat/${chatId}/messages`, {
+                                method: 'GET',
+                                credentials: 'same-origin'
+                            })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success && data.messages) {
+                                        console.log(`Đã tải ${data.messages.length} tin nhắn từ server`);
+
+                                        // Hiển thị tin nhắn từ API
+                                        displayChatMessages(chatId, data.messages);
+
+                                        // Lưu ID chat hiện tại vào localStorage
+                                        localStorage.setItem('currentChatId', chatId);
+
+                                        // Hiển thị thông báo thành công
+                                        showNotification('Hoàn tất', 'Đã tải nội dung cuộc trò chuyện thành công.', 'success');
+                                    } else {
+                                        console.error('API trả về lỗi hoặc không có tin nhắn:', data);
+                                        showNotification('Lỗi', 'Không thể tải tin nhắn cho cuộc trò chuyện này.', 'error');
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Lỗi khi tải tin nhắn:', error);
+                                    showNotification('Lỗi', 'Không thể tải tin nhắn. Vui lòng thử lại sau.', 'error');
+                                });
+                        } else {
+                            console.error('Người dùng chưa đăng nhập, không thể tải chat từ server');
+                            showNotification('Lỗi', 'Không tìm thấy cuộc trò chuyện này trong lịch sử.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+                        showNotification('Lỗi', 'Không thể tải cuộc trò chuyện. Vui lòng thử lại sau.', 'error');
+                    });
+                return;
+            }
+
+            console.log(`Đã tìm thấy chat ID ${chatId} trong localStorage với ${chat.messages ? chat.messages.length : 0} tin nhắn`);
+
+            // Lưu ID chat hiện tại vào localStorage
+            localStorage.setItem('currentChatId', chatId);
+
+            // Hiển thị tin nhắn từ localStorage
+            displayChatMessages(chatId, chat.messages);
+        }
+
+        // Hiển thị tin nhắn của một chat
+        function displayChatMessages(chatId, messages) {
+            console.log(`Hiển thị tin nhắn cho chat ID: ${chatId}, số lượng: ${messages ? messages.length : 0}`);
 
             // Xóa các tin nhắn hiện tại
             const chatContainer = document.getElementById('chat-container');
-            chatContainer.innerHTML = '';
+            chatContainer.innerHTML = '<div class="h-full overflow-y-auto flex flex-col space-y-4 bg-white"></div>';
+            const chatDiv = chatContainer.querySelector('div');
 
-            // Thêm tin nhắn chào mừng
+            // Thêm tin nhắn chào mừng nếu không có tin nhắn nào
+            if (!messages || messages.length === 0) {
             const welcomeMessage = document.createElement('div');
             welcomeMessage.className = 'chat-message bot-message';
-            welcomeMessage.innerHTML = '<p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">Xin chào! Tôi là trợ lý AI. Bạn có thể đặt câu hỏi về các tài liệu đã tải lên.</p>';
-            chatContainer.appendChild(welcomeMessage);
-
+                welcomeMessage.innerHTML = '<p>Xin chào! Tôi là trợ lý AI. Bạn có thể đặt câu hỏi về các tài liệu đã tải lên.</p>';
+                chatDiv.appendChild(welcomeMessage);
+            } else {
             // Thêm các tin nhắn từ lịch sử
-            chat.messages.forEach(message => {
+                messages.forEach((message, index) => {
+                    if (!message || !message.role || !message.content) {
+                        console.warn('Bỏ qua tin nhắn không hợp lệ:', message);
+                        return;
+                    }
+
+                    console.log(`Đang hiển thị tin nhắn ${index + 1}/${messages.length}, vai trò: ${message.role}`);
+
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `chat-message ${message.role === 'user' ? 'user-message' : 'bot-message'}`;
-                messageDiv.innerHTML = `<p class="text-gray-800 dark:text-gray-200 text-sm sm:text-base">${message.content}</p>`;
-                chatContainer.appendChild(messageDiv);
-            });
+
+                    // Tạo phần tử để hiển thị nội dung
+                    const contentElement = document.createElement('div');
+                    contentElement.className = 'message-content whitespace-pre-wrap';
+
+                    // Xử lý nội dung tin nhắn
+                    const content = message.content;
+
+                    // Kiểm tra xem nội dung có chứa HTML không (đặc biệt là từ bot)
+                    if (message.role === 'assistant' && (content.includes('<p>') || content.includes('<ul>') || content.includes('<ol>'))) {
+                        // Nếu có chứa HTML, sử dụng innerHTML
+                        contentElement.innerHTML = content;
+                        // Đảm bảo các liên kết mở trong tab mới
+                        const links = contentElement.querySelectorAll('a');
+                        links.forEach(link => {
+                            link.setAttribute('target', '_blank');
+                            link.setAttribute('rel', 'noopener noreferrer');
+                        });
+                    } else {
+                        // Nếu không chứa HTML, sử dụng text và chuyển đổi xuống dòng
+                        contentElement.textContent = content;
+                    }
+
+                    // Thêm nội dung vào tin nhắn
+                    messageDiv.appendChild(contentElement);
+
+                    // Thêm metadata (thời gian, ...)
+                    if (message.timestamp) {
+                        const timestamp = new Date(message.timestamp);
+                        const timeElement = document.createElement('div');
+                        timeElement.className = 'message-time text-xs text-gray-500 mt-1';
+                        timeElement.textContent = `${timestamp.toLocaleTimeString()} - ${timestamp.toLocaleDateString()}`;
+                        messageDiv.appendChild(timeElement);
+                    }
+
+                    chatDiv.appendChild(messageDiv);
+                });
+            }
 
             // Cuộn xuống cuối
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            chatDiv.scrollTop = chatDiv.scrollHeight;
 
             // Đóng sidebar trên thiết bị di động
             if (window.innerWidth < 1024) {
                 document.getElementById('sidebar').classList.add('-translate-x-full');
             }
 
-            // Lưu ID chat hiện tại vào sessionStorage
-            sessionStorage.setItem('currentChatId', chatId);
+            // Chuyển sang tab tài liệu để hiển thị chat
+            const documentsTab = document.getElementById('documents-tab');
+            if (documentsTab) {
+                documentsTab.click();
+            }
         }
 
         // Tạo đoạn chat mới
-        function createNewChat() {
+        function createNewChat(title = "Cuộc trò chuyện mới") {
+            // Kiểm tra xem có đang tạo chat mới không
+            if (window.isCreatingNewChat) {
+                console.log('Đang trong quá trình tạo chat mới, bỏ qua yêu cầu trùng lặp');
+                return null;
+            }
+            
+            // Đánh dấu đang tạo chat mới
+            window.isCreatingNewChat = true;
+            
+            console.log(`Đang tạo cuộc trò chuyện mới với tiêu đề: ${title}`);
+
+            // Tạo ID mới sử dụng crypto API (nếu có) hoặc phương thức tạo UUID
+            const newChatId = crypto.randomUUID ? crypto.randomUUID() :
+                ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                );
+
+            console.log(`Đã tạo UUID mới cho chat: ${newChatId}`);
+
+            // Tạo đối tượng chat mới
+            const newChat = {
+                id: newChatId,
+                title: title,
+                messages: [],
+                timestamp: new Date().toISOString()
+            };
+
+            // Thêm vào lịch sử chat
+            let chatHistory = getChatHistory();
+            chatHistory[newChat.id] = newChat;
+
+            // Lưu vào localStorage
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            
+            // Hiển thị chat mới
+            displayChatMessages(newChat.id, []);
+            
+            // Đặt chat này thành chat hiện tại
+            setCurrentChatId(newChat.id);
+            
+            // Cập nhật UI
+            updateChatHistoryUI();
+            
+            // Nếu người dùng đã đăng nhập, tạo chat trên Supabase
+            checkUserAuthentication().then(result => {
+                if (result.authenticated) {
+                    console.log('Người dùng đã đăng nhập, đang tạo chat mới trên Supabase...');
+                    
+                    // API để tạo chat mới
+                    fetch('/api/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            title: title
+                        }),
+                        credentials: 'same-origin'
+                    })
+                    .then(response => {
+                        console.log(`API tạo chat trả về mã: ${response.status}`);
+                        if (!response.ok) {
+                            throw new Error(`Lỗi khi tạo chat: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Đã tạo chat mới trên Supabase:', data);
+                        
+                        if (data.success && data.chat) {
+                            // Cập nhật ID chat từ Supabase
+                            const supabaseChat = data.chat;
+                            console.log(`Cập nhật ID chat từ ${newChat.id} thành ${supabaseChat.id} từ Supabase`);
+                            
+                            // Cập nhật chat trong lịch sử
+                            chatHistory = getChatHistory();
+                            const currentChat = chatHistory[newChat.id];
+                            
+                            if (currentChat) {
+                                // Tạo chat mới với ID từ Supabase, giữ nguyên nội dung
+                                chatHistory[supabaseChat.id] = {
+                                    id: supabaseChat.id,
+                                    title: currentChat.title,
+                                    messages: currentChat.messages,
+                                    timestamp: currentChat.timestamp
+                                };
+                                
+                                // Xóa chat cũ
+                                delete chatHistory[newChat.id];
+                                
+                                // Lưu lại vào localStorage
+                                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+                                
+                                // Cập nhật chat ID hiện tại
+                                setCurrentChatId(supabaseChat.id);
+                                
+                                // Cập nhật UI với chat ID mới
+                                updateChatHistoryUI();
+                                
+                                // Hiển thị thông báo
+                                showNotification('Tin nhắn', 'Đã tạo cuộc trò chuyện mới và đồng bộ với cơ sở dữ liệu.', 'success');
+                            } else {
+                                console.error(`Không tìm thấy chat ${newChat.id} trong lịch sử để cập nhật.`);
+                            }
+                        } else {
+                            console.error('Tạo chat mới trên Supabase thất bại:', data);
+                            showNotification('Lỗi', 'Không thể tạo cuộc trò chuyện mới trên cơ sở dữ liệu.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Lỗi khi tạo chat trên Supabase:', error);
+                        showNotification('Lỗi', 'Không thể tạo cuộc trò chuyện mới trên cơ sở dữ liệu. Vui lòng thử lại sau.', 'error');
+                    })
+                    .finally(() => {
+                        // Đặt lại trạng thái tạo chat
+                        window.isCreatingNewChat = false;
+                    });
+                } else {
+                    console.log('Người dùng chưa đăng nhập, chat chỉ được lưu ở localStorage');
+                    showNotification('Tin nhắn', 'Đã tạo cuộc trò chuyện mới. Hãy đăng nhập để đồng bộ với cơ sở dữ liệu.', 'info');
+                    // Đặt lại trạng thái tạo chat
+                    window.isCreatingNewChat = false;
+                }
+            }).catch(error => {
+                console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+                // Đặt lại trạng thái tạo chat
+                window.isCreatingNewChat = false;
+            });
+            
+            return newChat;
+        }
+
+        // Hàm tạo chat mới trong localStorage
+        function createLocalChat() {
+            // Tạo ID chat mới
+            const newChatId = Date.now().toString();
+
+            // Lưu chat mới vào lịch sử
+            const chatHistory = loadChatHistory();
+            chatHistory[newChatId] = {
+                id: newChatId,
+                title: 'Cuộc trò chuyện mới',
+                messages: [],
+                timestamp: new Date().toISOString()
+            };
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            localStorage.setItem('currentChatId', newChatId);
+
+            // Thiết lập giao diện chat mới
+            setupNewChatUI(newChatId);
+        }
+
+        // Thiết lập giao diện sau khi tạo chat mới
+        function setupNewChatUI(chatId) {
             // Xóa các tin nhắn hiện tại
             const chatContainer = document.getElementById('chat-container');
             const chatDiv = chatContainer.querySelector('div');
@@ -1514,21 +2164,12 @@
             welcomeMessage.innerHTML = '<p>Xin chào! Tôi là trợ lý AI. Bạn có thể đặt câu hỏi về các tài liệu đã tải lên.</p>';
             chatDiv.appendChild(welcomeMessage);
 
-            // Tạo ID chat mới
-            const newChatId = Date.now().toString();
+            // Cập nhật giao diện lịch sử chat
+            updateChatHistoryUI();
 
-            // Lưu chat mới vào lịch sử
-            saveChatHistory(newChatId, `Đoạn hội thoại mới`, [], new Date().toISOString());
-
-            // Lưu ID chat hiện tại vào sessionStorage
-            sessionStorage.setItem('currentChatId', newChatId);
-
-            // Chuyển đến tab tài liệu nếu đang ở tab lịch sử
-            const historyTab = document.getElementById('history-tab');
+            // Chuyển đến tab tài liệu để người dùng thấy chat mới
             const documentsTab = document.getElementById('documents-tab');
-            if (historyTab && historyTab.getAttribute('aria-selected') === 'true') {
                 documentsTab.click();
-            }
 
             // Đóng sidebar trên thiết bị di động
             if (window.innerWidth < 1024) {
@@ -1547,9 +2188,6 @@
             document.getElementById('question').value = '';
             toggleSendButton();
             
-            // Cập nhật lại UI lịch sử chat
-            updateChatHistoryUI();
-            
             // Cho phép focus vào ô nhập liệu
             setTimeout(() => {
                 document.getElementById('question').focus();
@@ -1558,48 +2196,99 @@
 
         // Lưu tin nhắn vào lịch sử chat hiện tại
         function saveMessageToCurrentChat(role, content) {
-            const currentChatId = sessionStorage.getItem('currentChatId');
+            if (!content.trim()) return;
 
-            if (!currentChatId) {
-                // Nếu chưa có chat hiện tại, tạo mới
-                const newChatId = Date.now().toString();
-                sessionStorage.setItem('currentChatId', newChatId);
+            console.log(`Đang lưu tin nhắn với vai trò: ${role}, nội dung: ${content.substring(0, 50)}...`);
 
-                saveChatHistory(newChatId, `Đoạn hội thoại ${getChatHistory().length + 1}`, [
-                    { role, content }
-                ]);
-                return;
-            }
-
-            // Lấy chat hiện tại từ lịch sử
-            const chatHistory = getChatHistory();
-            const currentChat = chatHistory.find(chat => chat.id === currentChatId);
-
+            let currentChat = getCurrentChat();
             if (!currentChat) {
-                // Nếu không tìm thấy chat hiện tại, tạo mới
-                saveChatHistory(currentChatId, `Đoạn hội thoại ${chatHistory.length + 1}`, [
-                    { role, content }
-                ]);
+                console.log("Không có cuộc trò chuyện hiện tại, tạo mới...");
+                
+                // Kiểm tra xem có đang trong quá trình tạo chat mới không
+                if (window.isCreatingNewChat) {
+                    console.log('Đã có một yêu cầu tạo chat mới đang xử lý, đợi 500ms và thử lại');
+                    setTimeout(() => saveMessageToCurrentChat(role, content), 500);
                 return;
             }
 
-            // Thêm tin nhắn vào chat hiện tại
-            currentChat.messages.push({ role, content });
+                currentChat = createNewChat();
 
-            // Cập nhật tiêu đề nếu là tin nhắn đầu tiên từ người dùng
-            if (role === 'user' && currentChat.messages.filter(m => m.role === 'user').length === 1) {
-                // Lấy 30 ký tự đầu tiên của tin nhắn làm tiêu đề
-                currentChat.title = content.length > 30 ? content.substring(0, 30) + '...' : content;
+                // Nếu không tạo được chat mới, bỏ qua tin nhắn này
+            if (!currentChat) {
+                    console.warn('Không thể tạo chat mới, bỏ qua tin nhắn hiện tại');
+                return;
+                }
             }
 
-            // Cập nhật thời gian
-            currentChat.timestamp = new Date().toISOString();
+            console.log(`Cuộc trò chuyện hiện tại: ID=${currentChat.id}, kiểu: ${typeof currentChat.id}`);
 
-            // Lưu lại vào localStorage
+            // Kiểm tra xem ID có phải là UUID hợp lệ không
+            if (typeof currentChat.id === 'number' || !isValidUUID(currentChat.id)) {
+                console.warn(`Chat ID không phải UUID hợp lệ: ${currentChat.id}, đang chuyển đổi...`);
+                // Nếu không phải UUID, tạo một UUID mới cho chat
+                currentChat.id = crypto.randomUUID ? crypto.randomUUID() :
+                    ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
+                        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                    );
+                console.log(`Đã chuyển đổi sang UUID mới: ${currentChat.id}`);
+                saveChatToLocalStorage(currentChat);
+            }
+
+            // Thêm tin nhắn mới vào mảng tin nhắn của chat hiện tại
+            const newMessage = {
+                role: role,
+                content: content,
+                timestamp: new Date().toISOString()
+            };
+
+            currentChat.messages.push(newMessage);
+
+            // Lưu vào localStorage
+            let chatHistory = getChatHistory();
+            chatHistory[currentChat.id] = currentChat;
             localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
 
-            // Cập nhật giao diện
-            updateChatHistoryUI();
+            // Nếu người dùng đã đăng nhập, gửi tin nhắn lên Supabase
+            checkUserAuthentication().then(result => {
+                if (result.authenticated) {
+                    console.log(`Người dùng đã đăng nhập, đang lưu tin nhắn lên Supabase cho chat ID: ${currentChat.id}`);
+
+                    // Gửi API để lưu tin nhắn
+                    fetch(`/api/chat/${currentChat.id}/message`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            role: role,
+                            content: content
+                        }),
+                        credentials: 'same-origin'
+                    })
+                        .then(response => {
+                            if (!response.ok) {
+                                console.error(`API lưu tin nhắn trả về lỗi: ${response.status}`);
+                                return response.json().then(data => Promise.reject(data));
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Đã lưu tin nhắn lên Supabase:', data);
+                            if (!data.success) {
+                                console.warn('API trả về thành công nhưng có thông báo lỗi:', data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Lỗi khi lưu tin nhắn lên Supabase:', error);
+                        });
+                } else {
+                    console.log('Người dùng chưa đăng nhập, tin nhắn chỉ được lưu ở localStorage');
+                }
+            }).catch(error => {
+                console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+            });
+
+            return newMessage;
         }
 
         // Xử lý kích thước màn hình thay đổi
@@ -1872,14 +2561,14 @@
 
         // Khởi tạo khi trang được tải
         window.onload = function () {
-            // Cập nhật giao diện lịch sử chat
-            updateChatHistoryUI();
+            // Tải lịch sử chat từ server
+            loadChatHistoryFromServer();
 
             // Thêm sự kiện cho nút tạo chat mới
             document.getElementById('new-chat-btn').addEventListener('click', createNewChat);
 
             // Kiểm tra xem có chat hiện tại không
-            const currentChatId = sessionStorage.getItem('currentChatId');
+            const currentChatId = localStorage.getItem('currentChatId');
             if (currentChatId) {
                 // Tải chat hiện tại
                 loadChat(currentChatId);
@@ -2043,6 +2732,8 @@
             const deleteFileForm = document.getElementById('deleteFileForm');
             if (deleteFileForm) {
                 deleteFileForm.addEventListener('submit', function (e) {
+                    e.preventDefault(); // Ngăn chặn submit form thông thường
+                    
                     // Hiển thị trạng thái đang xử lý
                     const submitButton = this.querySelector('button[type="submit"]');
                     submitButton.disabled = true;
@@ -2053,6 +2744,64 @@
                         </svg>
                         Đang xóa...
                     `;
+                    
+                    // Lấy filename từ form
+                    const filename = document.getElementById('deleteFilename').value;
+                    
+                    // Tạo FormData từ form
+                    const formData = new FormData(this);
+                    
+                    // Gửi request AJAX
+                    fetch('/remove', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Đóng modal
+                        document.getElementById('deleteFileModal').classList.add('hidden');
+                        
+                        if (data.success) {
+                            // Xóa phần tử file từ giao diện
+                            const fileElement = document.querySelector(`div[data-filename="${filename}"]`);
+                            if (fileElement) {
+                                fileElement.remove();
+                            }
+                            
+                            // Hiển thị thông báo thành công
+                            showNotification('Thành công', `Đã xóa tài liệu "${filename}" thành công.`, 'success');
+                            
+                            // Kiểm tra nếu không còn tài liệu nào, hiển thị thông báo
+                            const remainingFiles = document.querySelectorAll('#documents-content .space-y-1 > div');
+                            if (remainingFiles.length === 0) {
+                                const filesList = document.querySelector('#documents-content .space-y-1');
+                                if (filesList) {
+                                    const noFilesMessage = document.createElement('p');
+                                    noFilesMessage.className = 'text-xs sm:text-sm text-gray-500 dark:text-gray-400';
+                                    noFilesMessage.textContent = 'Chưa có tài liệu nào.';
+                                    filesList.appendChild(noFilesMessage);
+                                }
+                            }
+                        } else {
+                            // Hiển thị thông báo lỗi
+                            showNotification('Lỗi', data.message || 'Đã xảy ra lỗi khi xóa tài liệu.', 'error');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        showNotification('Lỗi', 'Đã xảy ra lỗi khi xóa tài liệu. Vui lòng thử lại.', 'error');
+                    })
+                    .finally(() => {
+                        // Khôi phục nút submit
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = 'Xóa tài liệu';
+                        
+                        // Đóng modal nếu chưa đóng
+                        document.getElementById('deleteFileModal').classList.add('hidden');
+                    });
                 });
             }
         };
@@ -2250,6 +2999,7 @@
             for (const [filename, info] of Object.entries(files)) {
                 const fileItem = document.createElement('div');
                 fileItem.className = 'flex items-center justify-between p-1.5 sm:p-2 text-sm font-normal text-gray-900 rounded-lg hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700';
+                fileItem.setAttribute('data-filename', filename); // Thêm thuộc tính data-filename
 
                 fileItem.innerHTML = `
                     <div class="truncate">
@@ -2293,43 +3043,28 @@
             });
         }
 
-        // Hàm xóa các câu hỏi gợi ý
+        // Xóa các câu hỏi gợi ý đã hiển thị
         function removeSuggestedQuestions() {
-            const suggestedQuestions = document.querySelector('.suggested-questions');
-            if (suggestedQuestions) {
-                suggestedQuestions.remove();
-                // Khôi phục padding bottom cho chat container
-                document.getElementById('chat-container').style.paddingBottom = '';
+            const suggestedQuestionsElement = document.querySelector('.suggested-questions');
+            if (suggestedQuestionsElement) {
+                suggestedQuestionsElement.remove();
+
+                // Reset padding bottom của chat container
+                const chatContainer = document.getElementById('chat-container').querySelector('div');
+                if (chatContainer) {
+                    chatContainer.style.paddingBottom = '';
+                }
             }
         }
 
-        // Hàm gửi câu hỏi gợi ý
-        function submitQuestion(question) {
-            console.log('Đang gửi câu hỏi gợi ý:', question);
-
-            // Đặt câu hỏi vào input
+        // Xử lý toggle nút gửi dựa trên nội dung input
+        function toggleSendButton() {
             const questionInput = document.getElementById('question');
-            questionInput.value = question;
-            console.log('Đã đặt câu hỏi vào input:', questionInput.value);
-            
-            // Cập nhật trạng thái nút gửi
-            toggleSendButton();
+            const sendButton = document.getElementById('send-button');
 
-            // Xóa các câu hỏi gợi ý cũ
-            removeSuggestedQuestions();
-
-            // Lấy form và nút submit
-            const form = document.getElementById('question-form');
-            const submitButton = document.getElementById('send-button');
-
-            // Đảm bảo nút submit không bị disabled
-            if (submitButton.disabled) {
-                submitButton.disabled = false;
+            if (questionInput && sendButton) {
+                sendButton.disabled = !questionInput.value.trim();
             }
-
-            // Kích hoạt click trên nút submit
-            console.log('Kích hoạt click trên nút submit...');
-            submitButton.click();
         }
 
         // Gọi hàm adjustChatContainerHeight mỗi khi ứng dụng được tải và khi có thay đổi kích thước màn hình hoặc xoay thiết bị
@@ -2408,18 +3143,779 @@
         }
 
         // Gọi hàm khi trang được tải
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             toggleSendButton();
             
             // Đảm bảo toggleSendButton được gọi khi người dùng dán nội dung
             const questionInput = document.getElementById('question');
             if (questionInput) {
-                questionInput.addEventListener('paste', function() {
+                questionInput.addEventListener('paste', function () {
                     // Chờ một chút để nội dung được dán vào
                     setTimeout(toggleSendButton, 10);
                 });
             }
         });
+
+        // Hàm gửi câu hỏi gợi ý
+        function submitQuestion(question) {
+            console.log('Đang gửi câu hỏi gợi ý:', question);
+
+            // Đặt câu hỏi vào input
+            const questionInput = document.getElementById('question');
+            questionInput.value = question;
+            console.log('Đã đặt câu hỏi vào input:', questionInput.value);
+
+            // Cập nhật trạng thái nút gửi
+            toggleSendButton();
+
+            // Xóa các câu hỏi gợi ý cũ
+            removeSuggestedQuestions();
+
+            // Lấy form và nút submit
+            const form = document.getElementById('question-form');
+            const submitButton = document.getElementById('send-button');
+
+            // Đảm bảo nút submit không bị disabled
+            if (submitButton.disabled) {
+                submitButton.disabled = false;
+            }
+
+            // Kích hoạt click trên nút submit
+            console.log('Kích hoạt click trên nút submit...');
+            submitButton.click();
+        }
+
+        // Hàm đồng bộ hóa chat hiện tại lên Supabase
+        function syncChatWithSupabase(chatId) {
+            // Kiểm tra xem người dùng đã đăng nhập chưa
+            fetch('/api/auth/check', {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+                .then(response => {
+                    console.log('API auth check status:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Auth check result:', data);
+                    if (data.logged_in) {
+                        console.log('Người dùng đã đăng nhập, đồng bộ chat ID:', currentChatId);
+
+                        // Nếu đã đăng nhập, thử gửi tin nhắn trực tiếp đến API
+                        if (role && content) {
+                            console.log('Lưu tin nhắn lên Supabase...');
+                            fetch(`/api/chat/${currentChatId}/message`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    role: role,
+                                    content: cleanContent
+                                }),
+                                credentials: 'same-origin'
+                            })
+                                .then(response => {
+                                    console.log('API add message status:', response.status);
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    console.log('API add message response:', data);
+                                    if (data.success) {
+                                        console.log('Đã lưu tin nhắn lên Supabase thành công');
+                                    } else {
+                                        console.error('Lỗi khi lưu tin nhắn lên Supabase:', data.message);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Lỗi khi gọi API thêm tin nhắn:', error);
+                                });
+                        }
+
+                        syncChatWithSupabase(currentChatId);
+                    } else {
+                        console.log('Người dùng chưa đăng nhập, chỉ lưu vào localStorage');
+                    }
+                })
+                .catch(error => {
+                    console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+                });
+        }
+
+        // Hàm đồng bộ hóa tất cả lịch sử chat lên Supabase
+        function syncAllChatsWithSupabase() {
+            // Kiểm tra xem người dùng đã đăng nhập chưa
+            fetch('/api/auth/check', {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.logged_in) {
+                        // Người dùng đã đăng nhập, tiến hành đồng bộ hóa tất cả chat
+                        const chatHistory = loadChatHistory();
+
+                        fetch('/api/chat/sync', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                chat_history: chatHistory
+                            }),
+                            credentials: 'same-origin'
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    showNotification('Đồng bộ hóa thành công', `Đã đồng bộ ${data.synced_count} cuộc trò chuyện lên cơ sở dữ liệu.`, 'success');
+                                } else {
+                                    showNotification('Lỗi đồng bộ hóa', data.message, 'error');
+                                }
+                            })
+                            .catch(error => {
+                                showNotification('Lỗi kết nối', 'Không thể kết nối đến máy chủ để đồng bộ hóa.', 'error');
+                                console.error('Lỗi khi gọi API đồng bộ chat:', error);
+                            });
+                    } else {
+                        showNotification('Chưa đăng nhập', 'Vui lòng đăng nhập để đồng bộ hóa lịch sử chat.', 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+                });
+        }
+
+        // Hàm lấy lịch sử chat từ Supabase
+        function loadChatHistoryFromSupabase() {
+            // Kiểm tra xem người dùng đã đăng nhập chưa
+            const hasLoadedHistory = localStorage.getItem('hasLoadedHistoryFromServer') === 'true';
+
+            fetch('/api/auth/check', {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.logged_in) {
+                        // Nếu đã đăng nhập, gọi API để lấy lịch sử chat
+                        fetch('/api/chat/history', {
+                            method: 'GET',
+                            credentials: 'same-origin'
+                        })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    // Đánh dấu đã tải lịch sử chat
+                                    localStorage.setItem('hasLoadedHistoryFromServer', 'true');
+
+                                    // Hiển thị thông báo chỉ khi chưa tải trước đó
+                                    const chatCount = Object.keys(data.chat_history || {}).length;
+                                    if (chatCount > 0 && !hasLoadedHistory) {
+                                        showNotification('Lịch sử chat', `Đã tải ${chatCount} cuộc trò chuyện từ cơ sở dữ liệu.`, 'success');
+                                    }
+
+                                    // Gộp dữ liệu với localStorage hiện tại
+                                    const localChatHistory = loadChatHistory();
+                                    let merged = { ...localChatHistory, ...data.chat_history };
+
+                                    // Lưu vào localStorage
+                                    localStorage.setItem('chatHistory', JSON.stringify(merged));
+
+                                    // Cập nhật UI
+                                    updateChatHistoryUI();
+                                } else if (data.message) {
+                                    // Nếu có lỗi cụ thể từ API, ghi log nhưng không hiển thị thông báo
+                                    console.log('Không thể tải lịch sử chat:', data.message);
+                                }
+                            })
+                            .catch(error => {
+                                // Chỉ ghi log lỗi, không hiển thị thông báo
+                                console.error('Lỗi khi gọi API lấy lịch sử chat:', error);
+                            });
+                    }
+                })
+                .catch(error => {
+                    console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+                });
+        }
+
+        // Thêm nút đồng bộ hóa lịch sử chat lên cơ sở dữ liệu
+        function addSyncButton() {
+            // Kiểm tra nếu đã có nút đồng bộ rồi thì không thêm nữa
+            if (document.getElementById('syncChatButton')) {
+                return;
+            }
+
+            // Thêm nút đồng bộ vào thanh công cụ
+            const chatToolbar = document.querySelector('.chat-toolbar');
+            if (chatToolbar) {
+                // Nút đồng bộ lịch sử lên server
+                const syncButton = document.createElement('button');
+                syncButton.id = 'syncChatButton';
+                syncButton.className = 'toolbar-button';
+                syncButton.innerHTML = '<i class="fas fa-sync-alt"></i> Đẩy dữ liệu lên';
+                syncButton.title = 'Đồng bộ hóa lịch sử chat từ thiết bị này lên cơ sở dữ liệu';
+                syncButton.onclick = function () {
+                    syncAllChatsWithSupabase();
+                };
+
+                chatToolbar.appendChild(syncButton);
+
+                // Nút tải lịch sử từ Supabase
+                const loadButton = document.createElement('button');
+                loadButton.id = 'loadChatButton';
+                loadButton.className = 'toolbar-button';
+                loadButton.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Tải dữ liệu';
+                loadButton.title = 'Tải lịch sử chat từ cơ sở dữ liệu về thiết bị này';
+                loadButton.onclick = function () {
+                    // Xóa flag đã tải để hiển thị thông báo
+                    localStorage.removeItem('hasLoadedHistoryFromServer');
+                    loadChatHistoryFromSupabase();
+                };
+
+                chatToolbar.appendChild(loadButton);
+            }
+        }
+
+        // Hiển thị thông báo
+        function showNotification(title, message, type = 'info') {
+            // Tạo container cho toast nếu chưa tồn tại
+            let toastContainer = document.getElementById('toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                toastContainer.className = 'fixed top-5 right-5 z-50 flex flex-col gap-2';
+                document.body.appendChild(toastContainer);
+            }
+
+            // Tạo toast mới
+            const toast = document.createElement('div');
+            toast.className = 'flex items-center w-full max-w-xs p-4 text-gray-500 bg-white rounded-lg shadow-sm dark:text-gray-400 dark:bg-gray-800';
+            toast.setAttribute('role', 'alert');
+
+            // Xác định icon và màu sắc dựa trên type
+            let iconHtml = '';
+            switch (type) {
+                case 'success':
+                    iconHtml = `
+                        <div class="inline-flex items-center justify-center shrink-0 w-8 h-8 text-green-500 bg-green-100 rounded-lg dark:bg-green-800 dark:text-green-200">
+                            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z"/>
+                            </svg>
+                            <span class="sr-only">Success icon</span>
+                        </div>`;
+                    break;
+                case 'error':
+                    iconHtml = `
+                        <div class="inline-flex items-center justify-center shrink-0 w-8 h-8 text-red-500 bg-red-100 rounded-lg dark:bg-red-800 dark:text-red-200">
+                            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 11.793a1 1 0 1 1-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 10 6.293 7.707a1 1 0 0 1 1.414-1.414L10 8.586l2.293-2.293a1 1 0 0 1 1.414 1.414L11.414 10l2.293 2.293Z"/>
+                            </svg>
+                            <span class="sr-only">Error icon</span>
+                        </div>`;
+                    break;
+                case 'warning':
+                    iconHtml = `
+                        <div class="inline-flex items-center justify-center shrink-0 w-8 h-8 text-orange-500 bg-orange-100 rounded-lg dark:bg-orange-700 dark:text-orange-200">
+                            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM10 15a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-4a1 1 0 0 1-2 0V6a1 1 0 0 1 2 0v5Z"/>
+                            </svg>
+                            <span class="sr-only">Warning icon</span>
+                        </div>`;
+                    break;
+                default: // info
+                    iconHtml = `
+                        <div class="inline-flex items-center justify-center shrink-0 w-8 h-8 text-blue-500 bg-blue-100 rounded-lg dark:bg-blue-800 dark:text-blue-200">
+                            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM10 15a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-4a1 1 0 0 1-2 0V6a1 1 0 0 1 2 0v5Z"/>
+                            </svg>
+                            <span class="sr-only">Info icon</span>
+                        </div>`;
+            }
+
+            // Tạo nội dung toast
+            toast.innerHTML = `
+                ${iconHtml}
+                <div class="ms-3 text-sm font-normal">
+                    <div class="font-semibold">${title}</div>
+                    <div>${message}</div>
+                </div>
+                <button type="button" class="ms-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex items-center justify-center h-8 w-8 dark:text-gray-500 dark:hover:text-white dark:bg-gray-800 dark:hover:bg-gray-700">
+                    <span class="sr-only">Close</span>
+                    <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                    </svg>
+                </button>`;
+
+            // Thêm toast vào container
+            toastContainer.appendChild(toast);
+
+            // Thêm sự kiện click cho nút đóng
+            const closeButton = toast.querySelector('button');
+            closeButton.addEventListener('click', () => {
+                toast.classList.add('opacity-0');
+            setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            });
+
+            // Tự động đóng sau 5 giây
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 5000);
+
+            // Thêm hiệu ứng fade in
+            requestAnimationFrame(() => {
+                toast.style.transition = 'opacity 300ms ease-in-out';
+                toast.classList.add('opacity-100');
+            });
+        }
+
+        // Thêm initialization code vào document ready
+        document.addEventListener('DOMContentLoaded', function () {
+            // ... existing code ...
+
+            // Thêm styles cho thông báo
+            addNotificationStyles();
+
+            // Thêm nút đồng bộ hóa
+            addSyncButton();
+
+            // Không tự động tải lịch sử chat từ Supabase khi trang được tải
+            // để tránh tạo nhiều chat trùng lặp
+            /*
+            setTimeout(() => {
+                loadChatHistoryFromSupabase();
+            }, 2000);
+            */
+
+            // ... existing code ...
+        });
+
+        // Hàm tải lịch sử chat từ localStorage
+        function loadChatHistory() {
+            const chatHistoryJSON = localStorage.getItem('chatHistory');
+            if (!chatHistoryJSON) {
+                return {};
+            }
+
+            try {
+                return JSON.parse(chatHistoryJSON);
+            } catch (e) {
+                console.error('Lỗi khi phân tích chuỗi JSON lịch sử chat:', e);
+                return {};
+            }
+        }
+
+        // Hiển thị cuộc trò chuyện được chọn
+        function displaySelectedChat(chatId) {
+            // Xóa nội dung chat hiện tại
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = '';
+
+            // Lấy lịch sử chat
+            const chatHistory = loadChatHistory();
+            const chat = chatHistory[chatId];
+
+            if (!chat) {
+                console.error('Không tìm thấy cuộc trò chuyện với ID:', chatId);
+                return;
+            }
+
+            // Hiển thị từng tin nhắn trong cuộc trò chuyện
+            chat.messages.forEach(msg => {
+                // Tạo phần tử tin nhắn dựa trên vai trò (user hoặc assistant)
+                const messageElement = createMessageElement(msg.role, msg.content);
+                chatMessages.appendChild(messageElement);
+            });
+
+            // Cuộn xuống tin nhắn cuối cùng
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Khi trang đã tải xong, thiết lập sự kiện cho các tab và nút
+        document.addEventListener('DOMContentLoaded', function () {
+            // Thiết lập sự kiện cho nút tạo chat mới
+            const newChatBtn = document.getElementById('new-chat-btn');
+            if (newChatBtn) {
+                newChatBtn.addEventListener('click', function (event) {
+                    // Ngăn chặn hành vi mặc định và sự lan truyền của sự kiện
+                    event.preventDefault();
+                    event.stopPropagation();
+                    
+                    console.log('Đã nhấn nút tạo chat mới');
+                    
+                    // Đảm bảo chỉ một yêu cầu được gửi
+                    if (!this.hasAttribute('data-processing')) {
+                        this.setAttribute('data-processing', 'true');
+                        createNewChat();
+                        
+                        // Xóa thuộc tính sau khi xử lý xong
+                        setTimeout(() => {
+                            this.removeAttribute('data-processing');
+                        }, 1000);
+                    } else {
+                        console.log('Đang xử lý yêu cầu trước đó, bỏ qua click mới');
+                    }
+                });
+            }
+
+            // Thiết lập sự kiện cho tab lịch sử
+            const historyTab = document.getElementById('history-tab');
+            if (historyTab) {
+                let isLoading = false;  // Biến để kiểm soát trạng thái đang tải
+
+                historyTab.addEventListener('click', function () {
+                    if (isLoading) return;  // Nếu đang tải thì không làm gì cả
+                    console.log('Đã click vào tab lịch sử chat');
+                    
+                    // Hiển thị loading khi bắt đầu tải
+                    const chatHistoryList = document.getElementById('chat-history-list');
+                    if (chatHistoryList) {
+                        chatHistoryList.innerHTML = `
+                            <div class="flex items-center justify-center p-4">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                                <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Đang tải lịch sử chat...</span>
+                            </div>
+                        `;
+                    }
+                    
+                    isLoading = true;  // Đánh dấu đang trong quá trình tải
+                    
+                    // Kiểm tra trạng thái đăng nhập và tải lịch sử chat
+                    fetch('/api/auth/check', {
+                        method: 'GET',
+                        credentials: 'same-origin'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.logged_in) {
+                            console.log('Người dùng đã đăng nhập, tải lịch sử chat từ server...');
+                            loadChatHistoryFromServer();
+                        } else {
+                            console.log('Người dùng chưa đăng nhập, không thể tải lịch sử chat');
+                            showNotification('Thông báo', 'Vui lòng đăng nhập để xem lịch sử trò chuyện.', 'info');
+                            if (chatHistoryList) {
+                                chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Vui lòng đăng nhập để xem lịch sử chat.</p>';
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+                        if (chatHistoryList) {
+                            chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-red-500 dark:text-red-400">Không thể kết nối đến máy chủ. Vui lòng thử lại sau.</p>';
+                        }
+                    })
+                    .finally(() => {
+                        isLoading = false;  // Đánh dấu đã hoàn thành quá trình tải
+                    });
+                });
+            }
+
+            // Thiết lập sự kiện cho tab tài liệu
+            const documentsTab = document.getElementById('documents-tab');
+            if (documentsTab) {
+                documentsTab.addEventListener('click', function () {
+                    // Tải lại danh sách tài liệu nếu cần
+                });
+            }
+
+            // Thiết lập ban đầu - chỉ tải lịch sử chat từ server, không gọi updateChatHistoryUI() trực tiếp
+            loadChatHistoryFromServer();
+
+            // Kiểm tra trạng thái đăng nhập và tạo chat mới nếu cần
+            fetch('/api/auth/check', {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.logged_in) {
+                    console.log('Người dùng đã đăng nhập, kiểm tra chat hiện tại...');
+                    
+                    // Nếu có ID chat hiện tại trong localStorage, tải chat đó
+                    const currentChatId = localStorage.getItem('currentChatId');
+                    
+                    if (currentChatId) {
+                        console.log(`Đã tìm thấy chat hiện tại: ${currentChatId}, đang tải...`);
+                        loadChat(currentChatId);
+                    } else {
+                        // Không có chat hiện tại, tạo mới ngay lập tức
+                        console.log('Không tìm thấy chat hiện tại, tạo chat mới...');
+                        createNewChat("Cuộc trò chuyện mới " + new Date().toLocaleDateString())
+                            .then(newChat => {
+                                if (newChat) {
+                                    console.log('Đã tạo chat mới:', newChat.id);
+                                    // Lưu ID chat mới và hiển thị nó
+                                    setCurrentChatId(newChat.id);
+                                    displayChatMessages(newChat.id, []);
+                            }
+                        })
+                        .catch(error => {
+                                console.error('Lỗi khi tạo chat mới:', error);
+                                showNotification('Lỗi', 'Không thể tạo cuộc trò chuyện mới.', 'error');
+                            });
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+            });
+        });
+
+        // Hàm kiểm tra xem một chuỗi có phải là UUID hợp lệ không
+        function isValidUUID(str) {
+            if (!str) return false;
+            
+            // Xóa tất cả ký tự không phải chữ số hoặc chữ cái
+            const cleanStr = str.toString().trim().replace(/[^a-f0-9]/gi, '');
+            
+            // Nếu còn lại chính xác 32 ký tự, đây là UUID hợp lệ
+            if (cleanStr.length === 32) {
+                return true;
+            }
+            
+            // Kiểm tra cả với format tiêu chuẩn
+            const uuidRegex = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[1-5][0-9a-f]{3}-?[89ab][0-9a-f]{3}-?[0-9a-f]{12}$/i;
+            return uuidRegex.test(str);
+        }
+
+        // Hàm lấy danh sách chat từ localStorage
+        function getChatHistory() {
+            try {
+                const chatHistory = localStorage.getItem('chatHistory');
+                return chatHistory ? JSON.parse(chatHistory) : {};
+            } catch (e) {
+                console.error('Lỗi khi đọc lịch sử chat từ localStorage:', e);
+                return {};
+            }
+        }
+
+        // Hàm lấy chat hiện tại
+        function getCurrentChat() {
+            const currentChatId = localStorage.getItem('currentChatId');
+            if (!currentChatId) return null;
+
+            const chatHistory = getChatHistory();
+            return chatHistory[currentChatId] || null;
+        }
+
+        // Hàm lưu chat vào localStorage
+        function saveChatToLocalStorage(chat) {
+            if (!chat || !chat.id) {
+                console.error('Không thể lưu chat không hợp lệ:', chat);
+                return false;
+            }
+
+            let chatHistory = getChatHistory();
+            chatHistory[chat.id] = chat;
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            return true;
+        }
+
+        // Hàm đặt ID chat hiện tại
+        function setCurrentChatId(chatId) {
+            // Lưu vào biến global
+            currentChatId = chatId;
+            // Lưu vào localStorage để ghi nhớ giữa các lần tải trang
+            localStorage.setItem('currentChatId', chatId);
+            console.log('Đã đặt chat hiện tại:', chatId);
+        }
+
+        // Hàm kiểm tra xác thực người dùng
+        function checkUserAuthentication() {
+            return fetch('/api/auth/check', {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+                .then(response => {
+                    console.log(`Kiểm tra xác thực: ${response.status}`);
+                    if (!response.ok) {
+                        throw new Error(`Lỗi khi kiểm tra xác thực: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(`Kết quả xác thực:`, data);
+                    return {
+                        authenticated: data.logged_in === true,
+                        userData: data.user || null
+                    };
+                })
+                .catch(error => {
+                    console.error('Lỗi khi kiểm tra xác thực:', error);
+                    return { authenticated: false, userData: null };
+                });
+        }
+
+        // Hàm đồng bộ chat với Supabase
+        function syncChatWithSupabase(chat) {
+            if (!chat || !chat.id) {
+                console.error('Không thể đồng bộ chat không hợp lệ:', chat);
+                return Promise.reject('Chat không hợp lệ');
+            }
+
+            // Kiểm tra người dùng đã đăng nhập chưa
+            return checkUserAuthentication().then(result => {
+                if (!result.authenticated) {
+                    console.log('Chưa đăng nhập, không thể đồng bộ');
+                    return Promise.reject('Chưa đăng nhập');
+                }
+
+                console.log(`Đồng bộ chat ${chat.id} lên Supabase...`);
+                return fetch('/api/chat/sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        chat_history: {
+                            [chat.id]: chat
+                        }
+                    })
+                })
+                    .then(response => {
+                        console.log(`API đồng bộ trả về mã: ${response.status}`);
+                        if (!response.ok) {
+                            throw new Error(`Lỗi khi đồng bộ: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Kết quả đồng bộ:', data);
+                        return data;
+                    })
+                    .catch(error => {
+                        console.error('Lỗi khi đồng bộ chat:', error);
+                        throw error;
+                    });
+            });
+        }
+
+        // Xử lý các nút trong navigation bar
+        document.addEventListener('DOMContentLoaded', function() {
+            // Nút Chat trong navigation
+            const navChatBtn = document.getElementById('nav-chat-btn');
+            if (navChatBtn) {
+                navChatBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    // Hiển thị tab tài liệu (nơi hiển thị chat)
+                    const documentsTab = document.getElementById('documents-tab');
+                    if (documentsTab) {
+                        documentsTab.click();
+                    }
+                });
+            }
+
+            // Nút Tài liệu trong navigation
+            const navDocumentsBtn = document.getElementById('nav-documents-btn');
+            if (navDocumentsBtn) {
+                navDocumentsBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    // Hiển thị tab tài liệu
+                    const documentsTab = document.getElementById('documents-tab');
+                    if (documentsTab) {
+                        documentsTab.click();
+                    }
+                });
+            }
+
+            // Nút Lịch sử trong navigation
+            const navHistoryBtn = document.getElementById('nav-history-btn');
+            if (navHistoryBtn) {
+                navHistoryBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    // Hiển thị tab lịch sử
+                    const historyTab = document.getElementById('history-tab');
+                    if (historyTab) {
+                        historyTab.click();
+                    }
+                });
+            }
+
+            // Nút Đăng xuất
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Chuyển hướng đến trang đăng xuất ngay lập tức
+                        window.location.href = '/logout';
+                });
+            }
+
+            // Kiểm tra trạng thái đăng nhập và hiển thị phù hợp
+            checkLoginStatus();
+        });
+
+        // Kiểm tra trạng thái đăng nhập
+        function checkLoginStatus() {
+            fetch('/api/auth/check', {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                const userMenuButton = document.getElementById('user-menu-button');
+                const notLoggedInElements = document.querySelectorAll('.not-logged-in');
+                const loggedInElements = document.querySelectorAll('.logged-in');
+                const userInfo = document.getElementById('user-info');
+                const userName = document.getElementById('user-name');
+                const userEmail = document.getElementById('user-email');
+                const profileName = document.getElementById('profile-name');
+                const profileEmail = document.getElementById('profile-email');
+
+                if (data.logged_in) {
+                    // Người dùng đã đăng nhập
+                    console.log('Người dùng đã đăng nhập:', data.user);
+                    
+                    // Hiển thị các phần tử dành cho người đã đăng nhập, ẩn các phần tử cho người chưa đăng nhập
+                    if (userMenuButton) userMenuButton.classList.remove('hidden');
+                    notLoggedInElements.forEach(el => el.classList.add('hidden'));
+                    loggedInElements.forEach(el => el.classList.remove('hidden'));
+                    
+                    // Cập nhật thông tin người dùng trong dropdown
+                    if (userName && data.user) {
+                        // Ưu tiên dùng fullname, nếu không có thì dùng username, nếu không thì dùng giá trị mặc định
+                        userName.textContent = data.user.full_name || data.user.fullname || data.user.username || 'Người dùng';
+                        userEmail.textContent = data.user.email || '';
+                    }
+                    
+                    // Cập nhật thông tin trong modal profile
+                    if (profileName && data.user) {
+                        profileName.textContent = data.user.full_name || data.user.fullname || data.user.username || 'Người dùng';
+                        profileEmail.textContent = data.user.email || '';
+                        
+                        // Cập nhật giá trị vào form
+                        const fullnameInput = document.getElementById('fullname');
+                        const emailInput = document.getElementById('email');
+                        
+                        if (fullnameInput) {
+                            fullnameInput.value = data.user.full_name || data.user.fullname || data.user.username || '';
+                        }
+                        
+                        if (emailInput) {
+                            emailInput.value = data.user.email || '';
+                        }
+                    }
+                } else {
+                    // Người dùng chưa đăng nhập
+                    console.log('Người dùng chưa đăng nhập');
+                    
+                    // Ẩn các phần tử dành cho người đã đăng nhập, hiển thị các phần tử cho người chưa đăng nhập
+                    if (userMenuButton) userMenuButton.classList.add('hidden');
+                    notLoggedInElements.forEach(el => el.classList.remove('hidden'));
+                    loggedInElements.forEach(el => el.classList.add('hidden'));
+                }
+            })
+            .catch(error => {
+                console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
+            });
+        }
     </script>
     <script>
         tailwind.config = {
@@ -2427,26 +3923,278 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: { "50": "#eff6ff", "100": "#dbeafe", "200": "#bfdbfe", "300": "#93c5fd", "400": "#60a5fa", "500": "#3b82f6", "600": "#2563eb", "700": "#1d4ed8", "800": "#1e40af", "900": "#1e3a8a", "950": "#172554" }
+                        primary: '#007bff',
+                        secondary: '#6c757d',
+                        success: '#28a745',
+                        info: '#17a2b8',
+                        warning: '#ffc107',
+                        danger: '#dc3545',
+                        light: '#f8f9fa',
+                        dark: '#343a40'
                     }
-                },
-                fontFamily: {
-                    'body': [
-                        'Inter',
-                        'ui-sans-serif',
-                        'system-ui',
-                        'sans-serif'
-                    ],
-                    'sans': [
-                        'Inter',
-                        'ui-sans-serif',
-                        'system-ui',
-                        'sans-serif'
-                    ]
                 }
             }
         }
     </script>
-</body>
 
+    <!-- Modal Hồ sơ cá nhân -->
+    <div id="profileModal" tabindex="-1" aria-hidden="true" class="fixed top-0 left-0 right-0 z-50 hidden w-full p-2 sm:p-4 overflow-x-hidden overflow-y-auto md:inset-0 h-[calc(100%-1rem)] max-h-full">
+        <div class="relative w-full max-w-2xl max-h-full">
+            <!-- Modal content -->
+            <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
+                <!-- Modal header -->
+                <div class="flex items-center justify-between p-3 sm:p-4 md:p-5 border-b rounded-t dark:border-gray-600">
+                    <h3 class="text-lg sm:text-xl font-medium text-gray-900 dark:text-white">Hồ sơ cá nhân</h3>
+                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-hide="profileModal">
+                        <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                        </svg>
+                        <span class="sr-only">Đóng</span>
+                    </button>
+                </div>
+                <!-- Modal body -->
+                <div class="p-3 sm:p-4 md:p-5 space-y-4">
+                    <div class="flex items-center mb-6">
+                        <div class="mr-4">
+                            <img class="w-16 h-16 rounded-full" src="https://flowbite.com/docs/images/people/profile-picture-5.jpg" alt="user photo">
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-semibold text-gray-900 dark:text-white" id="profile-name">Người dùng</h4>
+                            <p class="text-sm text-gray-500 dark:text-gray-400" id="profile-email">name@example.com</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabs -->
+                    <div class="mb-4 border-b border-gray-200 dark:border-gray-700">
+                        <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="profile-tabs" role="tablist">
+                            <li class="mr-2" role="presentation">
+                                <button class="inline-block p-4 border-b-2 rounded-t-lg active" id="personal-info-tab" data-tabs-target="#personal-info" type="button" role="tab" aria-controls="personal-info" aria-selected="true">Thông tin cá nhân</button>
+                            </li>
+                            <li class="mr-2" role="presentation">
+                                <button class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300" id="change-password-tab" data-tabs-target="#change-password" type="button" role="tab" aria-controls="change-password" aria-selected="false">Đổi mật khẩu</button>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Tab content -->
+                    <div id="profile-tab-content">
+                        <!-- Thông tin cá nhân -->
+                        <div class="block" id="personal-info" role="tabpanel" aria-labelledby="personal-info-tab">
+                            <form id="personal-info-form" class="space-y-4 sm:space-y-6">
+                                <div>
+                                    <label for="fullname" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Họ và tên</label>
+                                    <input type="text" name="fullname" id="fullname" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Nhập họ và tên">
+                                </div>
+                                <div>
+                                    <label for="email" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Email</label>
+                                    <input type="email" name="email" id="email" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="name@example.com" readonly>
+                                </div>
+                                <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Cập nhật thông tin</button>
+                            </form>
+                        </div>
+                        
+                        <!-- Đổi mật khẩu -->
+                        <div class="hidden" id="change-password" role="tabpanel" aria-labelledby="change-password-tab">
+                            <form id="change-password-form" class="space-y-4 sm:space-y-6">
+                                <div>
+                                    <label for="current-password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Mật khẩu hiện tại</label>
+                                    <input type="password" name="current-password" id="current-password" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="••••••••" required>
+                                </div>
+                                <div>
+                                    <label for="new-password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Mật khẩu mới</label>
+                                    <input type="password" name="new-password" id="new-password" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="••••••••" required>
+                                </div>
+                                <div>
+                                    <label for="confirm-password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Xác nhận mật khẩu mới</label>
+                                    <input type="password" name="confirm-password" id="confirm-password" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="••••••••" required>
+                                </div>
+                                <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Cập nhật mật khẩu</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript để xử lý tương tác với modal hồ sơ cá nhân -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab profile
+            const profileTabs = document.querySelectorAll('#profile-tabs [role="tab"]');
+            const profileTabContents = document.querySelectorAll('#profile-tab-content [role="tabpanel"]');
+            
+            profileTabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // Bỏ active từ tất cả tabs
+                    profileTabs.forEach(t => {
+                        t.classList.remove('active', 'border-blue-600', 'text-blue-600');
+                        t.classList.add('border-transparent');
+                        t.setAttribute('aria-selected', 'false');
+                    });
+                    
+                    // Thêm active cho tab được chọn
+                    this.classList.add('active', 'border-blue-600', 'text-blue-600');
+                    this.classList.remove('border-transparent');
+                    this.setAttribute('aria-selected', 'true');
+                    
+                    // Ẩn tất cả nội dung tab
+                    profileTabContents.forEach(content => {
+                        content.classList.add('hidden');
+                        content.classList.remove('block');
+                    });
+                    
+                    // Hiển thị nội dung tab được chọn
+                    const target = document.querySelector(this.getAttribute('data-tabs-target'));
+                    if (target) {
+                        target.classList.remove('hidden');
+                        target.classList.add('block');
+                    }
+                });
+            });
+            
+            // Điền thông tin hồ sơ khi mở modal
+            document.getElementById('profile-modal-btn').addEventListener('click', function() {
+                // Lấy thông tin người dùng từ dropdown
+                const userName = document.getElementById('user-name').textContent;
+                const userEmail = document.getElementById('user-email').textContent;
+                
+                // Điền thông tin vào form
+                document.getElementById('profile-name').textContent = userName;
+                document.getElementById('profile-email').textContent = userEmail;
+                document.getElementById('fullname').value = userName;
+                document.getElementById('email').value = userEmail;
+            });
+            
+            // Xử lý form cập nhật thông tin cá nhân
+            document.getElementById('personal-info-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Lấy thông tin từ form
+                const fullname = document.getElementById('fullname').value;
+                
+                // Gửi yêu cầu cập nhật
+                fetch('/api/user/profile', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fullname: fullname
+                    }),
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Cập nhật thông tin hiển thị
+                        document.getElementById('user-name').textContent = fullname;
+                        document.getElementById('profile-name').textContent = fullname;
+                        
+                        // Hiển thị thông báo thành công
+                        showNotification('Cập nhật thành công', 'Thông tin cá nhân đã được cập nhật.', 'success');
+                    } else {
+                        showNotification('Lỗi cập nhật', data.message || 'Không thể cập nhật thông tin cá nhân.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Lỗi khi cập nhật thông tin:', error);
+                    showNotification('Lỗi kết nối', 'Không thể kết nối đến máy chủ.', 'error');
+                });
+            });
+            
+            // Xử lý form đổi mật khẩu
+            document.getElementById('change-password-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Lấy thông tin từ form
+                const currentPassword = document.getElementById('current-password').value;
+                const newPassword = document.getElementById('new-password').value;
+                const confirmPassword = document.getElementById('confirm-password').value;
+                
+                // Kiểm tra mật khẩu mới và xác nhận mật khẩu
+                if (newPassword !== confirmPassword) {
+                    showNotification('Lỗi', 'Mật khẩu mới và xác nhận mật khẩu không khớp.', 'error');
+                    return;
+                }
+                
+                // Gửi yêu cầu đổi mật khẩu
+                fetch('/api/user/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPassword
+                    }),
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Reset form
+                        document.getElementById('change-password-form').reset();
+                        
+                        // Hiển thị thông báo thành công
+                        showNotification('Đổi mật khẩu thành công', 'Mật khẩu của bạn đã được cập nhật.', 'success');
+                        
+                        // Chuyển về tab thông tin cá nhân
+                        document.getElementById('personal-info-tab').click();
+                    } else {
+                        showNotification('Lỗi đổi mật khẩu', data.message || 'Không thể đổi mật khẩu.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Lỗi khi đổi mật khẩu:', error);
+                    showNotification('Lỗi kết nối', 'Không thể kết nối đến máy chủ.', 'error');
+                });
+            });
+        });
+    </script>
+    
+    <!-- Khởi tạo các thành phần Flowbite -->
+    <script>
+        // Khởi tạo tất cả các thành phần Flowbite khi trang đã tải xong
+        document.addEventListener('DOMContentLoaded', function() {
+            // Khởi tạo thủ công các modal, dropdown và tab
+            const modalButtons = document.querySelectorAll('[data-modal-toggle]');
+            modalButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const modalId = this.getAttribute('data-modal-target');
+                    const modalElement = document.getElementById(modalId);
+                    if (modalElement) {
+                        modalElement.classList.remove('hidden');
+                        document.body.classList.add('overflow-hidden');
+                    }
+                });
+            });
+            
+            const modalCloseButtons = document.querySelectorAll('[data-modal-hide]');
+            modalCloseButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const modalId = this.getAttribute('data-modal-hide');
+                    const modalElement = document.getElementById(modalId);
+                    if (modalElement) {
+                        modalElement.classList.add('hidden');
+                        document.body.classList.remove('overflow-hidden');
+                    }
+                });
+            });
+            
+            // Nếu người dùng nhấp vào khu vực bên ngoài modal, đóng modal
+            const modals = document.querySelectorAll('[aria-hidden="true"]');
+            modals.forEach(modal => {
+                modal.addEventListener('click', function(event) {
+                    if (event.target === this) {
+                        this.classList.add('hidden');
+                        document.body.classList.remove('overflow-hidden');
+                    }
+                });
+            });
+            
+            console.log('Đã khởi tạo tất cả các thành phần UI');
+        });
+    </script>
+</body>
 </html>

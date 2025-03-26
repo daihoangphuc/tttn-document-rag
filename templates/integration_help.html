@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng dẫn tích hợp Supabase - RAG System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
+    <style>
+        pre {
+            background-color: #f8f8f8;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900">
+    <nav class="bg-white border-b border-gray-200 px-4 py-2.5 dark:bg-gray-800 dark:border-gray-700 fixed left-0 right-0 top-0 z-50">
+        <div class="flex flex-wrap justify-between items-center">
+            <div class="flex justify-start items-center">
+                <a href="/" class="flex items-center">
+                    <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white">RAG System</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="pt-20 px-4 md:px-8 lg:px-16 max-w-5xl mx-auto">
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Hướng dẫn tích hợp Supabase vào hệ thống RAG</h1>
+        
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="p-4 mb-4 text-sm rounded-lg
+                        {% if category == 'error' %}text-red-800 bg-red-50 dark:bg-gray-800 dark:text-red-400{% endif %}
+                        {% if category == 'success' %}text-green-800 bg-green-50 dark:bg-gray-800 dark:text-green-400{% endif %}
+                        {% if category == 'warning' %}text-yellow-800 bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300{% endif %}
+                        {% if category == 'info' %}text-blue-800 bg-blue-50 dark:bg-gray-800 dark:text-blue-400{% endif %}"
+                        role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">1. Cài đặt các gói phụ thuộc</h2>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Đầu tiên, cài đặt các gói phụ thuộc cần thiết:</p>
+            <pre><code>pip install supabase python-dotenv</code></pre>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">2. Thiết lập biến môi trường</h2>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Tạo file <code>.env</code> trong thư mục gốc của dự án và thêm các thông tin cấu hình Supabase:</p>
+            <pre><code>SUPABASE_URL=https://your-project-url.supabase.co
+SUPABASE_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_KEY=your-supabase-service-key
+FLASK_SECRET_KEY=your-flask-secret-key</code></pre>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">3. Thiết lập cơ sở dữ liệu Supabase</h2>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Chạy tập tin SQL trong SQL Editor của Supabase:</p>
+            <ol class="list-decimal list-inside mb-4 text-gray-700 dark:text-gray-300">
+                <li class="mb-2">Đăng nhập vào trang quản trị Supabase</li>
+                <li class="mb-2">Chọn "SQL Editor" từ menu bên trái</li>
+                <li class="mb-2">Tạo một truy vấn mới và dán nội dung từ file <code>supabase_modules/setup_database.sql</code></li>
+                <li>Chạy truy vấn để thiết lập các bảng và chính sách</li>
+            </ol>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">4. Tích hợp vào hệ thống hiện có</h2>
+            
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Bước 1: Cập nhật app.py</h3>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Ở đầu file <code>app.py</code>, thêm các import cần thiết:</p>
+            <pre><code>from flask import Flask, render_template, request, jsonify, send_from_directory, render_template_string, session, redirect, url_for, flash
+from supabase_integration import setup_auth_routes, enhanced_upload_file, enhanced_remove_file, get_enhanced_index_html
+import os
+from dotenv import load_dotenv
+
+# Tải biến môi trường
+load_dotenv()</code></pre>
+
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-2">Bước 2: Khởi tạo ứng dụng Flask với secret key</h3>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Cập nhật khởi tạo ứng dụng Flask:</p>
+            <pre><code>app = Flask(__name__)
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default-secret-key')</code></pre>
+
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-2">Bước 3: Thiết lập routes xác thực</h3>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Sau khi khởi tạo ứng dụng Flask, thêm dòng:</p>
+            <pre><code># Thiết lập routes xác thực
+setup_auth_routes(app, index_html)</code></pre>
+
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white mt-6 mb-2">Bước 4: Cập nhật route upload và remove</h3>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Thay thế route upload hiện tại:</p>
+            <pre><code>@app.route('/upload', methods=['POST'])
+def upload_file():
+    return enhanced_upload_file(UPLOAD_FOLDER, index_html, global_all_files, load_settings, extract_text_pdf, extract_text_docx, extract_text_txt, add_document, save_state)</code></pre>
+
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Thay thế route remove hiện tại:</p>
+            <pre><code>@app.route('/remove', methods=['POST'])
+def remove_file():
+    return enhanced_remove_file(index_html, global_all_files, load_settings, remove_document)</code></pre>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">5. Cập nhật giao diện người dùng</h2>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Thay thế biến <code>index_html</code> hiện tại bằng phiên bản nâng cao:</p>
+            <pre><code>index_html = get_enhanced_index_html()</code></pre>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Hoặc tích hợp các phần tử UI từ phiên bản nâng cao vào template hiện tại.</p>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">6. Kiểm tra chức năng</h2>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Sau khi triển khai, hãy kiểm tra các chức năng:</p>
+            <ol class="list-decimal list-inside mb-4 text-gray-700 dark:text-gray-300">
+                <li class="mb-2">Đăng ký tài khoản mới</li>
+                <li class="mb-2">Đăng nhập</li>
+                <li class="mb-2">Tải lên và quản lý file</li>
+                <li class="mb-2">Xem hồ sơ người dùng</li>
+                <li>Đăng xuất</li>
+            </ol>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">7. Giải quyết vấn đề</h2>
+            <p class="mb-4 text-gray-700 dark:text-gray-300">Nếu gặp lỗi khi tích hợp, hãy kiểm tra:</p>
+            <ol class="list-decimal list-inside mb-4 text-gray-700 dark:text-gray-300">
+                <li class="mb-2">Biến môi trường đã được thiết lập đúng</li>
+                <li class="mb-2">Cơ sở dữ liệu Supabase đã được thiết lập chính xác</li>
+                <li class="mb-2">Tất cả các routes đã được định nghĩa đúng</li>
+                <li>Thư mục uploads có quyền ghi</li>
+            </ol>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">8. Bảo mật</h2>
+            <ul class="list-disc list-inside mb-4 text-gray-700 dark:text-gray-300">
+                <li class="mb-2">Đảm bảo sử dụng HTTPS trong môi trường sản xuất</li>
+                <li class="mb-2">Không bao giờ để lộ các khóa API Supabase</li>
+                <li>Thường xuyên thay đổi Flask secret key</li>
+            </ul>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">9. Cấu trúc module Supabase</h2>
+            <ul class="mb-4 text-gray-700 dark:text-gray-300">
+                <li class="mb-2"><strong>supabase_modules/config.py</strong>: Khởi tạo kết nối Supabase</li>
+                <li class="mb-2"><strong>supabase_modules/auth.py</strong>: Xử lý đăng ký, đăng nhập, đăng xuất và quản lý phiên người dùng</li>
+                <li class="mb-2"><strong>supabase_modules/chat_history.py</strong>: Quản lý lịch sử trò chuyện</li>
+                <li class="mb-2"><strong>supabase_modules/file_manager.py</strong>: Lưu trữ và quản lý file theo người dùng</li>
+                <li class="mb-2"><strong>supabase_modules/helpers.py</strong>: Các hàm tiện ích</li>
+                <li><strong>supabase_integration.py</strong>: Tích hợp các module trên vào hệ thống RAG</li>
+            </ul>
+        </div>
+    </div>
+
+    <footer class="bg-white dark:bg-gray-800 py-6 px-4 mt-6 border-t border-gray-200 dark:border-gray-700">
+        <div class="max-w-5xl mx-auto text-center text-gray-600 dark:text-gray-400">
+            <p>&copy; 2023 RAG System. Tất cả quyền được bảo lưu.</p>
+        </div>
+    </footer>
+</body>
+</html> 

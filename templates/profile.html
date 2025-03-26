@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <title>Hồ sơ cá nhân - RAG System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900">
+    <!-- Navbar -->
+    <nav class="bg-white border-b border-gray-200 px-4 py-2.5 dark:bg-gray-800 dark:border-gray-700 fixed left-0 right-0 top-0 z-50">
+        <div class="flex flex-wrap justify-between items-center">
+            <div class="flex justify-start items-center">
+                <a href="/" class="flex items-center">
+                    <span class="self-center text-xl font-semibold whitespace-nowrap dark:text-white">RAG System</span>
+                </a>
+            </div>
+            <div class="flex items-center lg:order-2">
+                <button type="button" class="flex mr-3 text-sm bg-gray-800 rounded-full md:mr-0 focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600" id="user-menu-button" aria-expanded="false" data-dropdown-toggle="user-dropdown" data-dropdown-placement="bottom">
+                    <span class="sr-only">Mở menu</span>
+                    <div class="relative w-10 h-10 overflow-hidden bg-gray-100 rounded-full dark:bg-gray-600">
+                        <svg class="absolute w-12 h-12 text-gray-400 -left-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path></svg>
+                    </div>
+                </button>
+                <!-- Dropdown menu -->
+                <div class="hidden z-50 my-4 text-base list-none bg-white divide-y divide-gray-100 rounded-lg shadow dark:bg-gray-700 dark:divide-gray-600" id="user-dropdown">
+                    <div class="px-4 py-3">
+                        <span class="block text-sm text-gray-900 dark:text-white">{{ user.email }}</span>
+                    </div>
+                    <ul class="py-2" aria-labelledby="user-menu-button">
+                        <li>
+                            <a href="/profile" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white">Hồ sơ</a>
+                        </li>
+                        <li>
+                            <a href="/logout" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-200 dark:hover:text-white">Đăng xuất</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="pt-20 px-6 py-8 mx-auto">
+        <div class="max-w-4xl mx-auto">
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-4 mb-4 text-sm rounded-lg
+                            {% if category == 'error' %}text-red-800 bg-red-50 dark:bg-gray-800 dark:text-red-400{% endif %}
+                            {% if category == 'success' %}text-green-800 bg-green-50 dark:bg-gray-800 dark:text-green-400{% endif %}
+                            {% if category == 'warning' %}text-yellow-800 bg-yellow-50 dark:bg-gray-800 dark:text-yellow-300{% endif %}
+                            {% if category == 'info' %}text-blue-800 bg-blue-50 dark:bg-gray-800 dark:text-blue-400{% endif %}"
+                            role="alert">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            <!-- Profile section -->
+            <div class="bg-white shadow rounded-lg p-6 dark:bg-gray-800 mb-6">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Thông tin cá nhân</h3>
+                
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
+                        <p class="text-base font-medium text-gray-900 dark:text-white">{{ user.email }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Ngày tham gia</p>
+                        <p class="text-base font-medium text-gray-900 dark:text-white">{{ user.created_at|default('N/A', true) }}</p>
+                    </div>
+                </div>
+                
+                <div class="mt-6">
+                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">Đổi mật khẩu</h4>
+                    <form action="/change-password" method="post" class="space-y-4">
+                        <div>
+                            <label for="current_password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Mật khẩu hiện tại</label>
+                            <input type="password" name="current_password" id="current_password" class="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" required>
+                        </div>
+                        <div>
+                            <label for="new_password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Mật khẩu mới</label>
+                            <input type="password" name="new_password" id="new_password" class="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" required>
+                        </div>
+                        <div>
+                            <label for="confirm_new_password" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Xác nhận mật khẩu mới</label>
+                            <input type="password" name="confirm_new_password" id="confirm_new_password" class="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white" required>
+                        </div>
+                        <button type="submit" class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">Cập nhật mật khẩu</button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- File Management section -->
+            <div class="bg-white shadow rounded-lg p-6 dark:bg-gray-800">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Quản lý tài liệu</h3>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                            <tr>
+                                <th scope="col" class="px-6 py-3">Tên tài liệu</th>
+                                <th scope="col" class="px-6 py-3">Ngày tải lên</th>
+                                <th scope="col" class="px-6 py-3">Trạng thái</th>
+                                <th scope="col" class="px-6 py-3">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if files %}
+                                {% for file in files %}
+                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                                    <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                        {{ file.filename }}
+                                    </th>
+                                    <td class="px-6 py-4">{{ file.created_at }}</td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-2 py-1 rounded text-xs font-medium
+                                        {% if file.status == 'active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300{% endif %}
+                                        {% if file.status == 'processing' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300{% endif %}
+                                        {% if file.status == 'error' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300{% endif %}">
+                                            {{ file.status }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <form action="/delete-file" method="post" class="inline">
+                                            <input type="hidden" name="file_id" value="{{ file.id }}">
+                                            <button type="submit" class="font-medium text-red-600 dark:text-red-500 hover:underline" onclick="return confirm('Bạn có chắc chắn muốn xóa tài liệu này?')">Xóa</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
+                                    <td colspan="4" class="px-6 py-4 text-center">Không có tài liệu nào</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
+    <script>
+        // Xác thực mật khẩu khớp nhau
+        document.querySelector('form[action="/change-password"]').addEventListener('submit', function(e) {
+            const newPassword = document.getElementById('new_password').value;
+            const confirmNewPassword = document.getElementById('confirm_new_password').value;
+            
+            if (newPassword !== confirmNewPassword) {
+                e.preventDefault();
+                alert('Mật khẩu mới và xác nhận mật khẩu mới không khớp!');
+            }
+        });
+    </script>
+</body>
+</html> 
