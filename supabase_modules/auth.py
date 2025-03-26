@@ -9,6 +9,7 @@ from flask import request, redirect, url_for, session, jsonify, flash
 from werkzeug.exceptions import Unauthorized
 from supabase import create_client, Client
 from werkzeug.security import generate_password_hash, check_password_hash
+from urllib.parse import urlparse, parse_qs
 
 # Thiết lập logging
 logger = logging.getLogger(__name__)
@@ -242,11 +243,11 @@ def change_password(user_id, current_password, new_password):
                 "password": new_password
             })
             
-            if not response or not response.user:
+            if response and response.user:
+                logger.info(f"Đã đổi mật khẩu thành công cho user ID: {user_id}")
+                return True, "Đổi mật khẩu thành công!"
+            else:
                 return False, "Không thể cập nhật mật khẩu, vui lòng thử lại sau"
-            
-            logger.info(f"Đã đổi mật khẩu thành công cho user ID: {user_id}")
-            return True, "Đổi mật khẩu thành công!"
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Lỗi khi cập nhật mật khẩu mới: {error_msg}")
@@ -391,3 +392,119 @@ def setup_auth_routes(app):
         return jsonify({
             "logged_in": False
         }) 
+    
+    @app.route('/auth/google', methods=['GET'])
+    def auth_google():
+        """
+        Bắt đầu quá trình đăng nhập bằng Google
+        """
+        if not supabase:
+            flash("Chưa cấu hình kết nối Supabase", "error")
+            return redirect(url_for('login'))
+
+        try:
+            # Sử dụng flow đơn giản hơn, cho phép Supabase tự quản lý PKCE
+            response = supabase.auth.sign_in_with_oauth({
+                "provider": "google"
+            })
+            
+            # Lưu lại URL để chuyển hướng
+            if response and response.url:
+                logger.info(f"Đã tạo URL OAuth: {response.url}")
+                return redirect(response.url)
+            else:
+                logger.error("Không thể tạo URL OAuth")
+                flash("Không thể kết nối với Google. Vui lòng thử lại sau.", "error")
+                return redirect(url_for('login'))
+                
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Lỗi khi tạo URL OAuth với Google: {error_msg}")
+            flash(f"Lỗi xác thực: {error_msg}", "error")
+            return redirect(url_for('login'))
+
+    @app.route('/auth/callback', methods=['GET'])
+    def auth_callback():
+        """
+        Xử lý callback từ OAuth provider (Google)
+        """
+        if not supabase:
+            flash("Chưa cấu hình kết nối Supabase", "error")
+            return redirect(url_for('login'))
+
+        try:
+            # Lấy thông tin code từ URL parameters
+            code = request.args.get('code')
+            
+            logger.info(f"Nhận callback với code={code[:10] if code else 'None'}")
+            
+            if not code:
+                logger.error("Không có code trong callback URL")
+                flash("Xác thực thất bại. Không có mã xác thực.", "error")
+                return redirect(url_for('login'))
+            
+            # Trong một số trường hợp, session đã được thiết lập bởi Supabase
+            # khi callback được gọi. Kiểm tra session hiện tại trước.
+            try:
+                current_user = supabase.auth.get_user()
+                if current_user and current_user.user:
+                    # Đã có session, lấy tokens từ Supabase và lưu vào Flask session
+                    session_data = supabase.auth.get_session()
+                    if session_data and session_data.session:
+                        session['access_token'] = session_data.session.access_token
+                        session['refresh_token'] = session_data.session.refresh_token
+                        session['user_id'] = current_user.user.id
+                        session['email'] = current_user.user.email
+                        
+                        logger.info(f"Đăng nhập OAuth thành công - session đã có sẵn cho: {current_user.user.email}")
+                        flash("Đăng nhập thành công!", "success")
+                        return redirect(url_for('index'))
+            except Exception as e:
+                logger.info(f"Không có session hiện tại, tiếp tục với exchange_code_for_session: {str(e)}")
+            
+            # Nếu chưa có session, thực hiện trao đổi code để lấy session
+            try:
+                logger.info("Trao đổi code lấy session...")
+                # Sử dụng đúng tham số cho Supabase theo tài liệu
+                # https://supabase.com/docs/reference/python/auth-exchangecodeforsession
+                session_response = supabase.auth.exchange_code_for_session({
+                    "auth_code": code
+                })
+                
+                if session_response and session_response.session:
+                    # Lưu session token
+                    session['access_token'] = session_response.session.access_token
+                    session['refresh_token'] = session_response.session.refresh_token
+                    session['user_id'] = session_response.user.id
+                    session['email'] = session_response.user.email
+                    
+                    logger.info(f"Đăng nhập OAuth thành công qua exchange_code_for_session cho: {session_response.user.email}")
+                    flash("Đăng nhập thành công!", "success")
+                    return redirect(url_for('index'))
+                else:
+                    logger.error("Không nhận được session sau khi trao đổi code")
+            except Exception as e:
+                logger.error(f"Lỗi khi trao đổi code lấy session: {str(e)}")
+            
+            # Nếu các cách trên không thành công
+            logger.error("Không thể xử lý OAuth callback - các phương pháp đều thất bại")
+            flash("Đăng nhập không thành công. Vui lòng thử lại.", "error")
+            return redirect(url_for('login'))
+                
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Lỗi khi xử lý OAuth callback: {error_msg}")
+            flash(f"Lỗi xác thực: {error_msg}", "error")
+            return redirect(url_for('login'))
+    
+    # Bổ sung route để chuyển hướng khi có code ở root URL
+    @app.before_request
+    def before_request_handler():
+        """
+        Xử lý khi có code OAuth trong URL gốc '/' trước khi route chính xử lý
+        """
+        if request.path == '/' and request.args.get('code'):
+            code = request.args.get('code')
+            logger.info(f"Phát hiện OAuth code trong root URL, chuyển hướng đến xử lý auth_callback")
+            # Chuyển hướng đến /auth/callback cùng với code để xử lý
+            return redirect(url_for('auth_callback', code=code))

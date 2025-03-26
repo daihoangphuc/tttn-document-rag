@@ -1641,9 +1641,54 @@
             // Xóa nội dung hiện tại
             chatHistoryList.innerHTML = '';
 
+            // Nếu không có chats được cung cấp, thử lấy từ localStorage
+            if (!chats) {
+                const localChatHistory = localStorage.getItem('chatHistory');
+                if (localChatHistory) {
+                    try {
+                        const chatData = JSON.parse(localChatHistory);
+                        if (Array.isArray(chatData)) {
+                            chats = chatData;
+                        } else if (typeof chatData === 'object') {
+                            chats = Object.keys(chatData).map(id => {
+                                return {
+                                    id: id,
+                                    title: chatData[id].title || 'Cuộc trò chuyện không có tiêu đề',
+                                    updated_at: chatData[id].timestamp || new Date().toISOString(),
+                                    created_at: chatData[id].timestamp || new Date().toISOString()
+                                };
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Lỗi khi parse chatHistory từ localStorage:', e);
+                    }
+                }
+            }
+            
+            // Thêm nút "Xóa tất cả" nếu có lịch sử chat trong localStorage
+            const localChatHistory = localStorage.getItem('chatHistory');
+            if (localChatHistory && localChatHistory !== '[]' && localChatHistory !== '{}') {
+                const clearAllButton = document.createElement('div');
+                clearAllButton.className = 'mb-2 flex justify-end';
+                clearAllButton.innerHTML = `
+                    <button id="clear-all-chat-history" type="button" 
+                            class="text-xs bg-red-100 text-red-700 hover:bg-red-200 rounded-lg px-2 py-1 
+                                  flex items-center dark:bg-red-900 dark:text-red-300 dark:hover:bg-red-800">
+                        <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        Xóa tất cả lịch sử
+                    </button>
+                `;
+                chatHistoryList.appendChild(clearAllButton);
+                
+                // Thêm sự kiện click cho nút xóa tất cả
+                document.getElementById('clear-all-chat-history').addEventListener('click', clearAllChatHistory);
+            }
+
             if (!chats || chats.length === 0) {
                 console.log('Không có cuộc hội thoại nào, hiển thị thông báo');
-                chatHistoryList.innerHTML = '<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Chưa có đoạn hội thoại nào.</p>';
+                chatHistoryList.innerHTML += '<p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Chưa có đoạn hội thoại nào.</p>';
                 return;
             }
 
@@ -1814,6 +1859,33 @@
             const currentChatId = localStorage.getItem('currentChatId');
             if (currentChatId === chatId) {
                 createNewChat();
+            }
+        }
+        
+        // Xóa toàn bộ lịch sử chat khỏi localStorage
+        function clearAllChatHistory() {
+            if (confirm('Bạn có chắc chắn muốn xóa TẤT CẢ lịch sử trò chuyện không? Hành động này không thể hoàn tác.')) {
+                // Xóa tất cả dữ liệu chat trong localStorage
+                localStorage.removeItem('chatHistory');
+                localStorage.removeItem('currentChatId');
+                
+                // Xóa các tin nhắn trong giao diện hiện tại
+                const chatContainer = document.getElementById('chat-container');
+                if (chatContainer) {
+                    chatContainer.innerHTML = '';
+                }
+                
+                // Cập nhật lại giao diện lịch sử chat
+                updateChatHistoryUI();
+                
+                // Hiển thị thông báo thành công
+                showNotification('Thành công', 'Đã xóa toàn bộ lịch sử trò chuyện.', 'success');
+                
+                // Chuyển sang tab tài liệu
+                const documentsTab = document.getElementById('documents-tab');
+                if (documentsTab) {
+                    documentsTab.click();
+                }
             }
         }
 
@@ -3847,7 +3919,7 @@
                         window.location.href = '/logout';
                 });
             }
-            
+
             // Kiểm tra trạng thái đăng nhập và hiển thị phù hợp
             checkLoginStatus();
         });

@@ -4622,8 +4622,8 @@ def initialize_tfidf():
 # setup_auth_routes_main = supabase_integration.setup_auth_routes
 # setup_auth_routes_main(app)
 # Chỉ sử dụng một cách đăng ký auth routes để tránh trùng lặp
-from supabase_modules.auth import setup_auth_routes as setup_auth_routes_status
-setup_auth_routes_status(app)
+from supabase_modules.auth import setup_auth_routes
+setup_auth_routes(app)
 
 # Thiết lập các route API cho chat history và tương tác với Supabase
 from supabase_integration import setup_chat_routes, api_update_profile, api_change_password
