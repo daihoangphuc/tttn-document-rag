@@ -371,6 +371,43 @@ def setup_chat_routes(app):
                 "message": f"Có lỗi xảy ra khi xóa cuộc trò chuyện: {str(e)}"
             }), 500
 
+    @app.route('/api/chats/delete-all', methods=['DELETE'])
+    @require_auth
+    def api_delete_all_chats():
+        """
+        API xóa tất cả cuộc trò chuyện và tin nhắn của người dùng
+        """
+        user = get_current_user()
+        if not user:
+            return jsonify({'status': 'error', 'message': 'Không tìm thấy thông tin người dùng'}), 401
+        
+        user_id = user['id']
+        app.logger.info(f"Deleting all chats for user {user_id}")
+        
+        try:
+            # Lấy client Supabase
+            supabase = get_supabase_client()
+            
+            # Lấy danh sách tất cả chat ID của người dùng
+            chats_response = supabase.table('chats').select('id').eq('user_id', user_id).execute()
+            
+            if len(chats_response.data) == 0:
+                return jsonify({'status': 'success', 'message': 'Không có cuộc trò chuyện nào để xóa'}), 200
+            
+            # Xóa tất cả tin nhắn của các chat
+            chat_ids = [chat['id'] for chat in chats_response.data]
+            messages_deletion = supabase.table('messages').delete().in_('chat_id', chat_ids).execute()
+            
+            # Xóa tất cả chat
+            chats_deletion = supabase.table('chats').delete().eq('user_id', user_id).execute()
+            
+            app.logger.info(f"Successfully deleted all chats for user {user_id}")
+            return jsonify({'status': 'success', 'message': f'Đã xóa {len(chat_ids)} cuộc trò chuyện'}), 200
+        
+        except Exception as e:
+            app.logger.error(f"Error deleting all chats for user {user_id}: {str(e)}")
+            return jsonify({'status': 'error', 'message': f'Lỗi: {str(e)}'}), 500
+
 # Các route xác thực
 def setup_auth_routes(app, index_html=None):
     """

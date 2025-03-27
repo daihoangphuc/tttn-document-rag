@@ -1771,30 +1771,26 @@
                                 // Hiển thị thông báo thành công
                                 showNotification('Thành công', 'Đã xóa cuộc trò chuyện.', 'success');
                                 
-                                // Chuyển sang tab tài liệu nếu không còn chat nào
+                                // Kiểm tra số lượng chat còn lại
                                 const remainingChats = document.querySelectorAll('.chat-history-item');
                                 if (remainingChats.length === 0) {
-                                    const documentsTab = document.getElementById('documents-tab');
-                                    if (documentsTab) {
-                                        documentsTab.click();
-                                    }
-                                }
-                                
-                                // Nếu đang xem chat này, tạo một chat mới hoặc chuyển sang tab tài liệu
-                                if (currentChatId === chatId) {
-                                    // Nếu còn chat khác, tải chat đầu tiên
-                                    if (remainingChats.length > 0) {
-                                        const firstChatId = remainingChats[0].dataset.chatId;
-                                        loadChat(firstChatId);
-                                            } else {
-                                        // Không còn chat nào, xóa nội dung hiện tại
-                                        document.getElementById('chat-container').innerHTML = '';
-                                        // Chuyển sang tab tài liệu
-                                        const documentsTab = document.getElementById('documents-tab');
-                                        if (documentsTab) {
-                                            documentsTab.click();
+                                    // Nếu không còn chat nào, tạo chat mới
+                                    createNewChat("Cuộc trò chuyện mới " + new Date().toLocaleDateString())
+                                        .then(newChat => {
+                                            if (newChat) {
+                                                // Lưu ID chat mới và hiển thị nó
+                                                setCurrentChatId(newChat.id);
+                                                displayChatMessages(newChat.id, []);
                                         }
-                                    }
+                                    })
+                                    .catch(error => {
+                                            console.error('Lỗi khi tạo chat mới:', error);
+                                            showNotification('Lỗi', 'Không thể tạo cuộc trò chuyện mới.', 'error');
+                                        });
+                                } else if (currentChatId === chatId) {
+                                    // Nếu đang xem chat bị xóa, chuyển sang chat đầu tiên còn lại
+                                    const firstChatId = remainingChats[0].dataset.chatId;
+                                    loadChat(firstChatId);
                                 }
                             } else {
                                 // Khôi phục nút xóa
@@ -1802,10 +1798,10 @@
                                 
                                 // Hiển thị thông báo lỗi
                                 showNotification('Lỗi', 'Không thể xóa cuộc trò chuyện.', 'error');
-                                            }
-                                        })
-                                        .catch(error => {
-                                            console.error('Lỗi khi xóa chat:', error);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Lỗi khi xóa chat:', error);
                             // Khôi phục nút xóa
                             this.innerHTML = `<svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>`;
                             showNotification('Lỗi', 'Không thể kết nối đến server. Vui lòng thử lại sau.', 'error');
@@ -1865,27 +1861,57 @@
         // Xóa toàn bộ lịch sử chat khỏi localStorage
         function clearAllChatHistory() {
             if (confirm('Bạn có chắc chắn muốn xóa TẤT CẢ lịch sử trò chuyện không? Hành động này không thể hoàn tác.')) {
-                // Xóa tất cả dữ liệu chat trong localStorage
-                localStorage.removeItem('chatHistory');
-                localStorage.removeItem('currentChatId');
+                // Hiển thị loading notification
+                showNotification('Đang xử lý', 'Đang xóa tất cả cuộc trò chuyện...', 'info');
                 
-                // Xóa các tin nhắn trong giao diện hiện tại
-                const chatContainer = document.getElementById('chat-container');
-                if (chatContainer) {
-                    chatContainer.innerHTML = '';
-                }
-                
-                // Cập nhật lại giao diện lịch sử chat
-                updateChatHistoryUI();
-                
-                // Hiển thị thông báo thành công
-                showNotification('Thành công', 'Đã xóa toàn bộ lịch sử trò chuyện.', 'success');
-                
-                // Chuyển sang tab tài liệu
-                const documentsTab = document.getElementById('documents-tab');
-                if (documentsTab) {
-                    documentsTab.click();
-                }
+                // Gọi API để xóa tất cả chat trong CSDL
+                fetch('/api/chats/delete-all', {
+                    method: 'DELETE',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Xóa tất cả dữ liệu chat trong localStorage
+                        localStorage.removeItem('chatHistory');
+                        localStorage.removeItem('currentChatId');
+                        
+                        // Xóa các tin nhắn trong giao diện hiện tại nhưng giữ lại tin nhắn chào mừng
+                        const chatContainer = document.getElementById('chat-container');
+                        if (chatContainer) {
+                            chatContainer.innerHTML = `
+                                <div class="h-full overflow-y-auto flex flex-col space-y-4 bg-white">
+                                    <div class="chat-message bot-message">
+                                        <p>Xin chào! Tôi là trợ lý AI. Bạn có thể đặt câu hỏi về các tài liệu đã tải lên.</p>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        
+                        // Cập nhật lại giao diện lịch sử chat
+                        updateChatHistoryUI();
+                        
+                        // Hiển thị thông báo thành công
+                        showNotification('Thành công', data.message, 'success');
+                        
+                        // Tự động tạo chat mới
+                        createNewChat("Cuộc trò chuyện mới " + new Date().toLocaleDateString());
+                    } else {
+                        showNotification('Lỗi', data.message || 'Đã xảy ra lỗi khi xóa lịch sử trò chuyện.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Lỗi khi xóa tất cả chat:', error);
+                    showNotification('Lỗi', 'Không thể kết nối đến server. Vui lòng thử lại sau.', 'error');
+                });
             }
         }
 
