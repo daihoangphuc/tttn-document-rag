@@ -1,7 +1,7 @@
 # Hệ thống RAG Chatbot
 
 ## Giới thiệu
-Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng cho phép người dùng tải lên tài liệu và đặt câu hỏi dựa trên nội dung của các tài liệu đó. Hệ thống sử dụng mô hình ngôn ngữ Gemini của Google để tạo ra câu trả lời chính xác và phù hợp với ngữ cảnh.
+Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng cho phép người dùng tải lên tài liệu và đặt câu hỏi dựa trên nội dung của các tài liệu đó. Hệ thống sử dụng mô hình ngôn ngữ Gemini của Google để tạo ra câu trả lời chính xác và phù hợp với ngữ cảnh. Hệ thống đã được tích hợp với Supabase để quản lý người dùng, lưu trữ lịch sử trò chuyện và tài liệu.
 
 ## Quy trình hoạt động
 
@@ -19,6 +19,14 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
  │                 │     │                 │     │                 │
  │  Gemini API     │◀───▶│  RAG Engine     │◀───▶│  Vector Store   │
  │                 │     │                 │     │                 │
+ └─────────────────┘     └─────────────────┘     └─────────┬───────┘
+                                                          │
+                                                          ▼
+                                                 ┌─────────────────┐
+                                                 │                 │
+                                                 │  Supabase       │
+                                                 │                 │
+                                                 └─────────────────┘
 ```
 
 ### 2. Quy trình xử lý tài liệu
@@ -35,6 +43,7 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
                                                             │             │
                                                             │ Vector Store│
                                                             │             │
+                                                            └─────────────┘
 ```
 
 ### 3. Quy trình trả lời câu hỏi
@@ -61,6 +70,7 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 1. **Upload File**:
    - Hỗ trợ các định dạng: PDF, DOCX, TXT
    - API Endpoint: `/upload`
+   - Hỗ trợ lưu trữ tài liệu theo người dùng (sau khi đăng nhập)
 
 2. **Extract Text**:
    - Trích xuất văn bản từ file
@@ -77,7 +87,7 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 5. **Vector Store**:
    - Lưu trữ và đánh chỉ mục các vector
    - Sử dụng FAISS để tìm kiếm hiệu quả
-   - Tùy chọn sao lưu dữ liệu lên Supabase
+   - Tích hợp lưu trữ dữ liệu trong Supabase theo người dùng
 
 #### 4.2. Trả lời câu hỏi
 
@@ -102,6 +112,28 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
    - Hàm: `generate_with_retry()`
    - Hỗ trợ chuyển đổi API key khi cần
 
+#### 4.3. Quản lý người dùng và dữ liệu
+
+1. **Xác thực người dùng**:
+   - Đăng ký, đăng nhập, đăng xuất, quên mật khẩu
+   - Quản lý phiên người dùng
+   - API Endpoints: `/login`, `/register`, `/logout`, `/forgot-password`
+
+2. **Quản lý hồ sơ người dùng**:
+   - Xem và cập nhật thông tin cá nhân
+   - Đổi mật khẩu
+   - API Endpoints: `/profile`, `/api/user/profile`, `/api/user/change-password`
+
+3. **Lịch sử trò chuyện**:
+   - Lưu trữ lịch sử trò chuyện theo người dùng
+   - Tạo, xem, cập nhật, xóa cuộc trò chuyện
+   - API Endpoints: `/api/chat/history`, `/api/chat`, `/api/chat/<chat_id>/message`
+
+4. **Quản lý tài liệu**:
+   - Lưu trữ và quản lý tài liệu theo người dùng
+   - Xóa tài liệu
+   - API Endpoints: `/upload`, `/remove`, `/delete-file`
+
 #### 5. Các tính năng đặc biệt
 
 1. **Tối ưu hóa cho tiếng Việt**:
@@ -122,7 +154,8 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 
 5. **Tích hợp Supabase**:
    - Lưu trữ và quản lý dữ liệu
-   - Xác thực và phân quyền người dùng (đang phát triển)
+   - Xác thực và phân quyền người dùng
+   - Đồng bộ hóa dữ liệu từ localStorage
 
 6. **Xử lý nhiều câu hỏi**:
    - Phát hiện và xử lý câu hỏi phức hợp
@@ -135,21 +168,37 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 ## Cấu trúc dự án
 ```
 BE/
-├── app.py                     # File chính của ứng dụng
-├── .env                       # File chứa các biến môi trường và API keys
-├── .env.example               # Mẫu cho file .env
-├── requirements.txt           # Danh sách các thư viện cần thiết
-├── README.md                  # Tài liệu hướng dẫn
-├── performance_metrics.csv    # Dữ liệu đánh giá hiệu suất
-├── templates/                 # Thư mục chứa các template HTML
-│   └── index.html             # Giao diện web
-├── uploads/                   # Thư mục lưu trữ các file được tải lên
-│   ├── .gitkeep               # File để giữ thư mục uploads trên git
-│   ├── rag_state.json         # Trạng thái của hệ thống RAG
-│   ├── faiss_index.bin        # Index vector FAISS
-│   ├── vectors.pkl            # Vector embedding được lưu trữ
-│   ├── tfidf_vectorizer.pkl   # Mô hình TF-IDF vectorizer
-│   └── tfidf_matrix.pkl       # Ma trận TF-IDF
+├── app.py                        # File chính của ứng dụng
+├── supabase_integration.py       # Module tích hợp Supabase
+├── .env                          # File chứa các biến môi trường và API keys
+├── .env.example                  # Mẫu cho file .env
+├── requirements.txt              # Danh sách các thư viện cần thiết
+├── README.md                     # Tài liệu hướng dẫn
+├── performance_metrics.csv       # Dữ liệu đánh giá hiệu suất
+├── supabase_modules/             # Thư mục chứa các module Supabase
+│   ├── __init__.py               # File khởi tạo
+│   ├── auth.py                   # Module xác thực người dùng
+│   ├── config.py                 # Cấu hình Supabase
+│   ├── chat_history.py           # Quản lý lịch sử trò chuyện
+│   ├── file_manager.py           # Quản lý file người dùng
+│   ├── helpers.py                # Các hàm tiện ích
+│   └── setup_database.sql        # Script SQL tạo bảng trong Supabase
+├── templates/                    # Thư mục chứa các template HTML
+│   ├── index.html                # Giao diện chính của chatbot
+│   ├── login.html                # Trang đăng nhập
+│   ├── register.html             # Trang đăng ký
+│   ├── profile.html              # Trang hồ sơ người dùng
+│   ├── forgot_password.html      # Trang quên mật khẩu
+│   └── integration_help.html     # Trang hướng dẫn tích hợp
+├── static/                       # Thư mục chứa các file tĩnh
+│   └── js/                       # Thư mục JavaScript
+├── uploads/                      # Thư mục lưu trữ các file được tải lên
+│   ├── .gitkeep                  # File để giữ thư mục uploads trên git
+│   ├── rag_state.json            # Trạng thái của hệ thống RAG
+│   ├── faiss_index.bin           # Index vector FAISS
+│   ├── vectors.pkl               # Vector embedding được lưu trữ
+│   ├── tfidf_vectorizer.pkl      # Mô hình TF-IDF vectorizer
+│   └── tfidf_matrix.pkl          # Ma trận TF-IDF
 ```
 
 ## Cài đặt
@@ -157,12 +206,13 @@ BE/
 ### Yêu cầu
 - Python 3.8 trở lên
 - Các thư viện Python được liệt kê trong `requirements.txt`
+- Tài khoản Supabase (cho chức năng xác thực và lưu trữ)
 
 ### Các bước cài đặt
 1. Clone repository:
 ```bash
 git clone <repository-url>
-cd tttn-document-rag/
+cd BE/
 ```
 
 2. Tạo và kích hoạt môi trường ảo:
@@ -196,7 +246,23 @@ NGROK_AUTH_TOKEN=your_ngrok_token
 DEBUG=True
 PORT=5000
 HOST=0.0.0.0
+FLASK_SECRET_KEY=your_secret_key_here
+
+# Cấu hình Supabase
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
+SUPABASE_JWT_SECRET=your_jwt_secret
+
+# Cấu hình Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+REDIRECT_URI=https://your_supabase_url.supabase.co/auth/v1/callback
 ```
+
+5. Thiết lập cơ sở dữ liệu Supabase:
+   - Đăng nhập vào Supabase và tạo dự án mới
+   - Chạy script SQL trong file `supabase_modules/setup_database.sql` trên SQL Editor của Supabase
+   - Lấy URL và API Key của dự án để cấu hình trong file `.env`
 
 ## Chạy ứng dụng
 
@@ -245,15 +311,38 @@ docker run -p 5000:5000 --env-file .env rag-chatbot
 
 ### Giao diện web
 1. Truy cập vào URL được hiển thị khi khởi động ứng dụng
-2. Tải lên tài liệu (hỗ trợ định dạng .txt, .pdf, .docx)
-3. Chọn phương pháp chunking phù hợp
-4. Đặt câu hỏi và nhận câu trả lời
+2. Đăng ký tài khoản mới hoặc đăng nhập (nếu đã có tài khoản)
+3. Tải lên tài liệu (hỗ trợ định dạng .txt, .pdf, .docx)
+4. Chọn phương pháp chunking phù hợp
+5. Đặt câu hỏi và nhận câu trả lời
 
 ### API Endpoints
 
-#### 1. Trả lời câu hỏi
-- **URL**: `/api/answer`
-- **Method**: POST
+#### 1. Xác thực người dùng
+- **Đăng ký**: `/register` (GET, POST)
+- **Đăng nhập**: `/login` (GET, POST)
+- **Đăng xuất**: `/logout` (GET)
+- **Quên mật khẩu**: `/forgot-password` (GET, POST)
+- **Xem hồ sơ**: `/profile` (GET)
+- **Cập nhật hồ sơ**: `/api/user/profile` (POST)
+- **Đổi mật khẩu**: `/api/user/change-password` (POST)
+
+#### 2. Quản lý trò chuyện
+- **Lấy lịch sử chat**: `/api/chat/history` (GET)
+- **Tạo chat mới**: `/api/chat` (POST)
+- **Thêm tin nhắn**: `/api/chat/<chat_id>/message` (POST)
+- **Lấy tin nhắn**: `/api/chat/<chat_id>/messages` (GET)
+- **Xóa chat**: `/api/chat/<chat_id>` (DELETE)
+- **Xóa tất cả chat**: `/api/chats/delete-all` (DELETE)
+- **Đồng bộ chat từ localStorage**: `/api/chat/sync` (POST)
+
+#### 3. Quản lý tài liệu
+- **Upload file**: `/upload` (POST)
+- **Xóa file**: `/remove` (POST), `/delete-file` (POST)
+- **Khởi tạo dữ liệu người dùng**: `/init-user-data` (POST)
+
+#### 4. Trả lời câu hỏi
+- **Trả lời câu hỏi**: `/api/answer` (POST)
 - **Body** (JSON):
 ```json
 {
@@ -265,51 +354,13 @@ docker run -p 5000:5000 --env-file .env rag-chatbot
 }
 ```
 
-#### 2. Upload File
-- **URL**: `/upload`
-- **Method**: POST
-- **Body** (form-data):
-  - `file`: File cần upload (Hỗ trợ: .txt, .pdf, .docx)
-  - `chunking_method`: Phương pháp chia chunk
-
-#### 3. Xóa File
-- **URL**: `/remove`
-- **Method**: POST
-- **Body** (form-data):
-  - `filename`: Tên file cần xóa
-
-#### 4. Lấy Thông tin Hiệu suất
-- **URL**: `/api/performance`
-- **Method**: GET
-- **Query Parameters**:
-  - `chunking_method`: (tùy chọn) Phương pháp chia chunk cần phân tích
-
-#### 5. Đánh giá Hệ thống
-- **URL**: `/api/evaluate`
-- **Method**: POST
-- **Body** (JSON):
-```json
-{
-    "queries": ["câu hỏi 1", "câu hỏi 2"],
-    "top_k": 5,
-    "chunking_method": "sentence_windows"
-}
-```
-
-#### 6. Lấy Danh sách Phương pháp Chunking
-- **URL**: `/api/chunking_methods`
-- **Method**: GET
-
-#### 7. Lưu Cài đặt
-- **URL**: `/settings`
-- **Method**: POST
-- **Body** (form-data): Các tham số cấu hình chunking
-
-#### 8. Xem Embeddings
-- **URL**: `/api/embeddings`
-- **Method**: GET
-- **Query Parameters**:
-  - `limit`: (tùy chọn) Số lượng embeddings hiển thị
+#### 5. Hiệu suất và cấu hình
+- **Lấy hiệu suất**: `/api/performance` (GET)
+- **Danh sách phương pháp chunking**: `/api/chunking_methods` (GET)
+- **Lưu cài đặt**: `/settings` (POST)
+- **Xem embeddings**: `/api/embeddings` (GET)
+- **Đánh giá hệ thống**: `/api/evaluate` (POST)
+- **Kiểm tra kết nối Supabase**: `/api/supabase-check` (GET)
 
 ## Phương pháp Chunking
 Hệ thống hỗ trợ nhiều phương pháp chunking khác nhau:
@@ -329,12 +380,20 @@ Hệ thống hỗ trợ nhiều phương pháp chunking khác nhau:
 - Sử dụng phương pháp chunking phù hợp với loại tài liệu
 - Điều chỉnh giá trị top_k và threshold khi truy vấn
 - Sử dụng các phương pháp tối ưu hóa cho tiếng Việt
+- Đăng nhập để lưu trữ và sử dụng dữ liệu cá nhân
 
 ## Xử lý lỗi
 - Kiểm tra định dạng file upload
-- Đảm bảo API keys hợp lệ trong file .env
+- Đảm bảo API keys (Gemini và Supabase) hợp lệ trong file .env
 - Kiểm tra logs để phát hiện và khắc phục lỗi
 - Sử dụng cơ chế chuyển đổi API key khi gặp lỗi quota
+- Đảm bảo kết nối với Supabase thông qua `/api/supabase-check`
+
+## Bảo mật
+- Sử dụng HTTPS trong môi trường sản xuất
+- Không bao giờ để lộ các khóa API (Gemini, Supabase)
+- Thường xuyên thay đổi mật khẩu người dùng và khóa JWT
+- Sao lưu dữ liệu định kỳ
 
 ## Đóng góp
 Vui lòng gửi pull request hoặc mở issue để đóng góp vào dự án.
