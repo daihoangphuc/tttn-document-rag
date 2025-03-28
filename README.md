@@ -20,8 +20,8 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
  │  Gemini API     │◀───▶│  RAG Engine     │◀───▶│  Vector Store   │
  │                 │     │                 │     │                 │
  └─────────────────┘     └─────────────────┘     └─────────┬───────┘
-                                                          │
-                                                          ▼
+                                                           │
+                                                           ▼
                                                  ┌─────────────────┐
                                                  │                 │
                                                  │  Supabase       │
@@ -229,6 +229,9 @@ source venv/bin/activate
 3. Cài đặt các thư viện cần thiết:
 ```bash
 pip install -r requirements.txt
+
+# Nên cập nhật pip sau khi cài đặt các thư viện
+pip install --upgrade pip
 ```
 
 4. Cấu hình file `.env`:
