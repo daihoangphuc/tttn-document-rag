@@ -5,55 +5,25 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 
 ## Quy trình hoạt động
 
-### Giải pháp thay thế: Sơ đồ với Mermaid (Hiển thị tốt hơn trên GitHub)
+![RAG System Architecture](./templates/images/rag-google-vertex-ai.png)
 
-Bạn có thể sử dụng cú pháp Mermaid để vẽ các sơ đồ, giúp hiển thị tốt hơn trên GitHub:
+Hệ thống RAG (Retrieval-Augmented Generation) được chia thành hai quy trình chính:
 
-#### 1. Tổng quan hệ thống
+1. **Quy trình xử lý tài liệu (Ingest documents)**:
+   - Source: Tài liệu nguồn được tải lên
+   - Parsing: Trích xuất văn bản và làm giàu dữ liệu
+   - Transformation: Phân đoạn (chunking) văn bản
+   - Indexing: Tạo embedding và đánh chỉ mục
+   - Vector DB: Lưu trữ vector và metadata
 
-```mermaid
-flowchart TD
-    A[Người dùng] -->|Request| B[Web Interface]
-    B -->|Process| C[Flask Server]
-    C -->|Query| D[RAG Engine]
-    D <-->|Generate| E[Gemini API]
-    D <-->|Retrieve| F[Local Storage\nVector Store]
-    D -->|Store/Retrieve| G[Supabase\nAuth, Files Metadata, Chat]
-```
+2. **Quy trình truy vấn (Query retrieval)**:
+   - LLM API: Nhận câu hỏi từ người dùng
+   - Preparing: Xử lý câu hỏi và tạo embedding
+   - Retrieval: Truy xuất thông tin từ Vector DB
+   - Ranking: Sắp xếp kết quả theo độ liên quan
+   - Serving: Định dạng kết quả và trả về LLM
 
-#### 2. Quy trình xử lý tài liệu
-
-```mermaid
-flowchart LR
-    A[Upload File] --> B[Extract Text]
-    B --> C[Chunking]
-    C --> D[Embedding]
-    D --> E[Local Storage]
-    
-    subgraph E[Local Storage]
-    F[FAISS Index]
-    G[TF-IDF Index]
-    end
-```
-
-#### 3. Quy trình trả lời câu hỏi
-
-```mermaid
-flowchart TD
-    A[Câu hỏi] --> B[Query Transform]
-    B --> C[Hybrid Search]
-    
-    subgraph C[Hybrid Search]
-    D[FAISS] 
-    E[TF-IDF]
-    end
-    
-    D --> F[Reranking]
-    E --> F
-    F --> G[Context Building]
-    G --> H[Gemini LLM]
-    H --> I[Trả lời]
-```
+Quy trình này sử dụng RAG Engine để tối ưu hóa kết quả trả về, tăng độ chính xác và giảm thiểu hiện tượng ảo giác (hallucination).
 
 > **Lưu ý**: Để sử dụng giải pháp Mermaid, bạn có thể thay thế các sơ đồ ASCII hiện tại bằng các sơ đồ Mermaid tương ứng. GitHub tự động render các sơ đồ Mermaid trong code block được đánh dấu là `mermaid`.
 
