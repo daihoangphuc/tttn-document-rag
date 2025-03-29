@@ -5,81 +5,57 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 
 ## Quy trình hoạt động
 
-### 1. Tổng quan hệ thống
+### Giải pháp thay thế: Sơ đồ với Mermaid (Hiển thị tốt hơn trên GitHub)
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│                 │     │                 │     │                 │
-│  Người dùng     │────▶│  Web Interface  │────▶│  Flask Server   │
-│                 │     │                 │     │                 │
-└─────────────────┘     └─────────────────┘     └─────────┬───────┘
-                                                          │
-                                                          ▼
- ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
- │                 │     │                 │     │                 │
- │  Gemini API     │◀───▶│  RAG Engine     │◀───▶│  Local Storage  │
- │                 │     │                 │     │  (Vector Store) │
- └─────────────────┘     └─────────────────┘     └─────────────────┘
-                                │
-                                ▼
-                        ┌─────────────────┐
-                        │   Supabase      │
-                        │ (Auth, Files    │
-                        │  Metadata, Chat)│
-                        └─────────────────┘
+Bạn có thể sử dụng cú pháp Mermaid để vẽ các sơ đồ, giúp hiển thị tốt hơn trên GitHub:
+
+#### 1. Tổng quan hệ thống
+
+```mermaid
+flowchart TD
+    A[Người dùng] -->|Request| B[Web Interface]
+    B -->|Process| C[Flask Server]
+    C -->|Query| D[RAG Engine]
+    D <-->|Generate| E[Gemini API]
+    D <-->|Retrieve| F[Local Storage\nVector Store]
+    D -->|Store/Retrieve| G[Supabase\nAuth, Files Metadata, Chat]
 ```
 
-### 2. Quy trình xử lý tài liệu
+#### 2. Quy trình xử lý tài liệu
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│             │     │             │     │             │     │             │
-│ Upload File │────▶│ Extract Text│────▶│ Chunking    │────▶│ Embedding   │
-│             │     │             │     │             │     │             │
-└─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
-                                                                   │
-                                                            ┌──────▼──────┐
-                                                            │  Local      │
-                                                            │  Storage    │
-                                                            │  ┌────────┐ │
-                                                            │  │ FAISS  │ │
-                                                            │  │ Index  │ │
-                                                            │  └────────┘ │
-                                                            │  ┌────────┐ │
-                                                            │  │ TF-IDF │ │
-                                                            │  │ Index  │ │
-                                                            │  └────────┘ │
-                                                            └─────────────┘
+```mermaid
+flowchart LR
+    A[Upload File] --> B[Extract Text]
+    B --> C[Chunking]
+    C --> D[Embedding]
+    D --> E[Local Storage]
+    
+    subgraph E[Local Storage]
+    F[FAISS Index]
+    G[TF-IDF Index]
+    end
 ```
 
-### 3. Quy trình trả lời câu hỏi
+#### 3. Quy trình trả lời câu hỏi
 
+```mermaid
+flowchart TD
+    A[Câu hỏi] --> B[Query Transform]
+    B --> C[Hybrid Search]
+    
+    subgraph C[Hybrid Search]
+    D[FAISS] 
+    E[TF-IDF]
+    end
+    
+    D --> F[Reranking]
+    E --> F
+    F --> G[Context Building]
+    G --> H[Gemini LLM]
+    H --> I[Trả lời]
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────────────┐
-│             │     │             │     │   Hybrid Search     │
-│ Câu hỏi     │────▶│ Query       │────▶│  ┌─────┐  ┌──────┐  │
-│             │     │ Transform   │     │  │FAISS│  │TF-IDF│  │
-└─────────────┘     └─────────────┘     │  └──┬──┘  └──┬───┘  │
-                                        └───────┬────────┬────┘
-                                                │        │
-                                         ┌──────▼────────▼──────┐
-                                         │                      │
-                                         │      Reranking       │
-                                         │                      │
-                                         └──────────┬───────────┘
-                                                    │
-                                         ┌──────────▼───────┐
-                                         │                  │
-                                         │ Context Building │
-                                         │                  │
-                                         └─────────┬────────┘
-                                                   │
-┌─────────────┐                          ┌─────────▼──────┐
-│             │                          │                │
-│ Trả lời     │◀─────────────────────────│   Gemini LLM   │
-│             │                          │                │
-└─────────────┘                          └────────────────┘
-```
+
+> **Lưu ý**: Để sử dụng giải pháp Mermaid, bạn có thể thay thế các sơ đồ ASCII hiện tại bằng các sơ đồ Mermaid tương ứng. GitHub tự động render các sơ đồ Mermaid trong code block được đánh dấu là `mermaid`.
 
 ### 4. Chi tiết các thành phần chính
 
