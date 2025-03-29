@@ -25,8 +25,6 @@ Hệ thống RAG (Retrieval-Augmented Generation) được thiết kế dựa tr
 
 Quy trình này sử dụng RAG Engine để tối ưu hóa kết quả trả về, tăng độ chính xác và giảm thiểu hiện tượng ảo giác (hallucination).
 
-> **Lưu ý**: Để sử dụng giải pháp Mermaid, bạn có thể thay thế các sơ đồ ASCII hiện tại bằng các sơ đồ Mermaid tương ứng. GitHub tự động render các sơ đồ Mermaid trong code block được đánh dấu là `mermaid`.
-
 ### 4. Chi tiết các thành phần chính
 
 #### 4.1. Xử lý tài liệu
