@@ -190,11 +190,11 @@
 
         .sidebar {
             width: 16rem;
+            transition: transform 0.3s ease;
         }
 
         .sidebar-collapsed {
             width: 4rem !important;
-            /* Chiều rộng khi thu nhỏ */
             overflow-x: hidden;
         }
 
@@ -211,20 +211,46 @@
             display: none;
         }
 
-        .sidebar-expander {
-            background-color: #f1f5f9;
-            color: #334155;
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
+        /* Cập nhật CSS cho nút toggle */
+        #toggleSidebar {
             display: flex !important;
-            /* Luôn hiển thị */
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            z-index: 50;
-            transition: background-color 0.2s ease, transform 0.3s ease;
+            transition: all 0.3s ease;
+        }
+
+        /* Ẩn nút toggle khi sidebar đang mở trên mobile */
+        @media (max-width: 1024px) {
+            #sidebar:not(.-translate-x-full) + * #toggleSidebar {
+                display: none !important;
+            }
+        }
+
+        /* Điều chỉnh vị trí nút toggle trên desktop */
+        @media (min-width: 1024px) {
+            #toggleSidebar {
+                display: none !important;
+            }
+        }
+
+        /* Xóa các CSS cũ không cần thiết */
+        .sidebar-expander {
+            display: none !important;
+        }
+
+        @media (max-width: 1024px) {
+            .sidebar-expander {
+                display: none !important;
+            }
         }
 
         .sidebar-expander:hover {
@@ -938,6 +964,27 @@
         @media (min-width: 1024px) {
             nav .flex.items-center.justify-start.rtl\:justify-end {
                 display: none;
+            }
+        }
+
+        /* Thay thế bằng CSS mới */
+        @media (max-width: 1024px) {
+            /* Xóa bỏ rule ẩn sidebar-expander */
+            .suggested-questions {
+                left: 0;
+                max-width: calc(100% - 1rem);
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .suggested-questions {
+                left: 16rem;
+                max-width: calc(100% - 16rem - 2rem);
+            }
+            
+            body.sidebar-collapsed .suggested-questions {
+                left: 4rem;
+                max-width: calc(100% - 4rem - 2rem);
             }
         }
     </style>
@@ -2018,12 +2065,12 @@
 
             // Thêm tin nhắn chào mừng nếu không có tin nhắn nào
             if (!messages || messages.length === 0) {
-            const welcomeMessage = document.createElement('div');
-            welcomeMessage.className = 'chat-message bot-message';
+                const welcomeMessage = document.createElement('div');
+                welcomeMessage.className = 'chat-message bot-message';
                 welcomeMessage.innerHTML = '<p>Xin chào! Tôi là trợ lý AI. Bạn có thể đặt câu hỏi về các tài liệu đã tải lên.</p>';
                 chatDiv.appendChild(welcomeMessage);
             } else {
-            // Thêm các tin nhắn từ lịch sử
+                // Thêm các tin nhắn từ lịch sử
                 messages.forEach((message, index) => {
                     if (!message || !message.role || !message.content) {
                         console.warn('Bỏ qua tin nhắn không hợp lệ:', message);
@@ -2032,43 +2079,9 @@
 
                     console.log(`Đang hiển thị tin nhắn ${index + 1}/${messages.length}, vai trò: ${message.role}`);
 
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `chat-message ${message.role === 'user' ? 'user-message' : 'bot-message'}`;
-
-                    // Tạo phần tử để hiển thị nội dung
-                    const contentElement = document.createElement('div');
-                    contentElement.className = 'message-content whitespace-pre-wrap';
-
-                    // Xử lý nội dung tin nhắn
-                    const content = message.content;
-
-                    // Kiểm tra xem nội dung có chứa HTML không (đặc biệt là từ bot)
-                    if (message.role === 'assistant' && (content.includes('<p>') || content.includes('<ul>') || content.includes('<ol>'))) {
-                        // Nếu có chứa HTML, sử dụng innerHTML
-                        contentElement.innerHTML = content;
-                        // Đảm bảo các liên kết mở trong tab mới
-                        const links = contentElement.querySelectorAll('a');
-                        links.forEach(link => {
-                            link.setAttribute('target', '_blank');
-                            link.setAttribute('rel', 'noopener noreferrer');
-                        });
-                    } else {
-                        // Nếu không chứa HTML, sử dụng text và chuyển đổi xuống dòng
-                        contentElement.textContent = content;
-                    }
-
-                    // Thêm nội dung vào tin nhắn
-                    messageDiv.appendChild(contentElement);
-
-                    // Thêm metadata (thời gian, ...)
-                    if (message.timestamp) {
-                        const timestamp = new Date(message.timestamp);
-                        const timeElement = document.createElement('div');
-                        timeElement.className = 'message-time text-xs text-gray-500 mt-1';
-                        timeElement.textContent = `${timestamp.toLocaleTimeString()} - ${timestamp.toLocaleDateString()}`;
-                        messageDiv.appendChild(timeElement);
-                    }
-
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = `chat-message ${message.role === 'user' ? 'user-message' : 'bot-message'}`;
+                    messageDiv.innerHTML = `<div class="whitespace-pre-wrap">${message.content}</div>`;
                     chatDiv.appendChild(messageDiv);
                 });
             }
@@ -2076,9 +2089,19 @@
             // Cuộn xuống cuối
             chatDiv.scrollTop = chatDiv.scrollHeight;
 
-            // Đóng sidebar trên thiết bị di động
+            // Đóng sidebar trên thiết bị di động nhưng giữ lại nút toggle
             if (window.innerWidth < 1024) {
-                document.getElementById('sidebar').classList.add('-translate-x-full');
+                const sidebar = document.getElementById('sidebar');
+                const toggleButton = document.getElementById('toggleSidebar');
+                
+                if (sidebar) {
+                    sidebar.classList.add('-translate-x-full');
+                }
+                
+                // Đảm bảo nút toggle luôn hiển thị
+                if (toggleButton) {
+                    toggleButton.style.display = 'flex';
+                }
             }
 
             // Chuyển sang tab tài liệu để hiển thị chat
@@ -4003,6 +4026,21 @@
                 console.error('Lỗi khi kiểm tra trạng thái đăng nhập:', error);
             });
         }
+
+        function updateProfileInfo(userInfo) {
+            const email = userInfo.email;
+            const displayName = email.split('@')[0]; // Lấy phần trước @ làm tên hiển thị
+            
+            document.getElementById('profile-name').textContent = displayName;
+            document.getElementById('profile-email').textContent = email;
+        }
+
+        // Thêm hàm này vào phần xử lý sau khi đăng nhập thành công
+        function handleLoginSuccess(response) {
+            if (response.user) {
+                updateProfileInfo(response.user);
+            }
+        }
     </script>
     <script>
         tailwind.config = {
@@ -4030,9 +4068,11 @@
             <!-- Modal content -->
             <div class="relative bg-white rounded-lg shadow dark:bg-gray-700">
                 <!-- Modal header -->
-                <div class="flex items-center justify-between p-3 sm:p-4 md:p-5 border-b rounded-t dark:border-gray-600">
+                <div class="flex items-start justify-between p-3 sm:p-4 md:p-5 border-b rounded-t dark:border-gray-600">
                     <h3 class="text-lg sm:text-xl font-medium text-gray-900 dark:text-white">Hồ sơ cá nhân</h3>
-                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" data-modal-hide="profileModal">
+                    <button type="button" 
+                            class="absolute top-3 right-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 flex justify-center items-center dark:hover:bg-gray-600 dark:hover:text-white" 
+                            data-modal-hide="profileModal">
                         <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
                             <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
                         </svg>

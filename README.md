@@ -17,16 +17,16 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
                                                           ▼
  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
  │                 │     │                 │     │                 │
- │  Gemini API     │◀───▶│  RAG Engine     │◀───▶│  Vector Store   │
- │                 │     │                 │     │                 │
- └─────────────────┘     └─────────────────┘     └─────────┬───────┘
-                                                           │
-                                                           ▼
-                                                 ┌─────────────────┐
-                                                 │                 │
-                                                 │  Supabase       │
-                                                 │                 │
-                                                 └─────────────────┘
+ │  Gemini API     │◀───▶│  RAG Engine     │◀───▶│  Local Storage  │
+ │                 │     │                 │     │  (Vector Store) │
+ └─────────────────┘     └─────────────────┘     └─────────────────┘
+                                │
+                                ▼
+                        ┌─────────────────┐
+                        │   Supabase      │
+                        │ (Auth, Files    │
+                        │  Metadata, Chat)│
+                        └─────────────────┘
 ```
 
 ### 2. Quy trình xử lý tài liệu
@@ -38,29 +38,47 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 │             │     │             │     │             │     │             │
 └─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
                                                                    │
-                                                                   ▼
-                                                            ┌─────────────┐
-                                                            │             │
-                                                            │ Vector Store│
-                                                            │             │
+                                                            ┌──────▼──────┐
+                                                            │  Local      │
+                                                            │  Storage    │
+                                                            │  ┌────────┐ │
+                                                            │  │ FAISS  │ │
+                                                            │  │ Index  │ │
+                                                            │  └────────┘ │
+                                                            │  ┌────────┐ │
+                                                            │  │ TF-IDF │ │
+                                                            │  │ Index  │ │
+                                                            │  └────────┘ │
                                                             └─────────────┘
 ```
 
 ### 3. Quy trình trả lời câu hỏi
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│             │     │             │     │             │     │             │
-│ Câu hỏi     │────▶│ Query       │────▶│ Retrieval   │────▶│ Reranking   │
-│             │     │ Transform   │     │             │     │             │
-└─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
-                                                                   │
-                                                                   ▼
- ┌─────────────┐                                            ┌─────────────┐
- │             │                                            │             │
- │ Trả lời     │◀───────────────────────────────────────────│ Gemini LLM  │
- │             │                                            │             │
- └─────────────┘                                            └─────────────┘
+┌─────────────┐     ┌─────────────┐     ┌─────────────────────┐
+│             │     │             │     │   Hybrid Search     │
+│ Câu hỏi     │────▶│ Query       │────▶│  ┌─────┐  ┌──────┐  │
+│             │     │ Transform   │     │  │FAISS│  │TF-IDF│  │
+└─────────────┘     └─────────────┘     │  └──┬──┘  └──┬───┘  │
+                                        └───────┬────────┬────┘
+                                                │        │
+                                         ┌──────▼────────▼──────┐
+                                         │                      │
+                                         │      Reranking       │
+                                         │                      │
+                                         └──────────┬───────────┘
+                                                    │
+                                         ┌──────────▼───────┐
+                                         │                  │
+                                         │ Context Building │
+                                         │                  │
+                                         └─────────┬────────┘
+                                                   │
+┌─────────────┐                          ┌─────────▼──────┐
+│             │                          │                │
+│ Trả lời     │◀─────────────────────────│   Gemini LLM   │
+│             │                          │                │
+└─────────────┘                          └────────────────┘
 ```
 
 ### 4. Chi tiết các thành phần chính
@@ -84,10 +102,15 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
    - Chuyển đổi các đoạn văn bản thành vector
    - Sử dụng mô hình: SentenceTransformer
 
-5. **Vector Store**:
-   - Lưu trữ và đánh chỉ mục các vector
-   - Sử dụng FAISS để tìm kiếm hiệu quả
-   - Tích hợp lưu trữ dữ liệu trong Supabase theo người dùng
+5. **Vector Store và Lưu trữ**:
+   - Lưu trữ và đánh chỉ mục các vector sử dụng FAISS
+   - Dữ liệu vector và index được lưu trữ cục bộ trong thư mục riêng của mỗi người dùng:
+     + `faiss_index.bin`: Index vector FAISS cho tìm kiếm semantic
+     + `vectors.pkl`: Vector embeddings của các chunks
+     + `tfidf_vectorizer.pkl` và `tfidf_matrix.pkl`: Index từ khóa cho tìm kiếm TF-IDF
+     + `rag_state.json`: Trạng thái và metadata của hệ thống RAG
+   - Metadata của files và lịch sử chat được lưu trong Supabase
+   - Mỗi người dùng có một thư mục riêng được đặt tên theo UUID
 
 #### 4.2. Trả lời câu hỏi
 
@@ -136,34 +159,35 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 
 #### 5. Các tính năng đặc biệt
 
-1. **Tối ưu hóa cho tiếng Việt**:
-   - Xử lý đặc thù cho ngôn ngữ tiếng Việt
-   - Sử dụng thư viện underthesea, pyvi
+1. **Xử lý tiếng Việt**:
+   - Phân tích và xử lý đặc thù cho tiếng Việt (`transform_query_for_vietnamese`, `fix_vietnamese_spacing`)
+   - Reranking tối ưu cho tiếng Việt (`rerank_results_for_vietnamese`)
+   - Điều chỉnh prompt cho Gemini để sinh văn bản tiếng Việt chuẩn xác
 
 2. **Quản lý API Key**:
-   - Hỗ trợ nhiều API key
-   - Tự động chuyển đổi khi gặp lỗi quota
+   - Hỗ trợ nhiều API key Gemini (`initialize_gemini`)
+   - Tự động chuyển đổi key khi gặp lỗi (`switch_api_key`)
+   - Cơ chế retry với backoff (`generate_with_retry`)
 
-3. **Đánh giá hiệu suất**:
-   - Theo dõi thời gian truy xuất và trả lời
-   - API Endpoint: `/api/performance`
+3. **Xử lý và tối ưu ngữ cảnh**:
+   - Xây dựng ngữ cảnh tối ưu từ chunks (`build_optimized_context`)
+   - Phân tích câu hỏi phức tạp và chia nhỏ (`split_multiple_questions`)
+   - Xác định trang nguồn chính xác (`identify_most_relevant_pages`)
 
-4. **Tùy chỉnh chunking**:
-   - Cho phép người dùng chọn phương pháp chunking
-   - Tùy chỉnh tham số qua API: `/settings`
+4. **Hybrid Search**:
+   - Kết hợp tìm kiếm ngữ nghĩa (FAISS) và từ khóa (TF-IDF)
+   - Reranking nâng cao với nhiều tiêu chí
+   - Điều chỉnh kết quả dựa trên loại câu hỏi
 
-5. **Tích hợp Supabase**:
-   - Lưu trữ và quản lý dữ liệu
-   - Xác thực và phân quyền người dùng
-   - Đồng bộ hóa dữ liệu từ localStorage
+5. **Performance Monitoring**:
+   - Theo dõi và phân tích hiệu suất (`track_performance`, `analyze_performance`)
+   - Đánh giá hệ thống với bộ test queries (`evaluate_performance`)
+   - API hiển thị metrics hiệu suất (`/api/performance`)
 
-6. **Xử lý nhiều câu hỏi**:
-   - Phát hiện và xử lý câu hỏi phức hợp
-   - Hàm: `split_multiple_questions()`
-
-7. **Gợi ý câu hỏi**:
-   - Tạo các câu hỏi liên quan đến tài liệu
-   - Hàm: `generate_similar_questions()`
+6. **Xử lý lỗi và gợi ý**:
+   - Gợi ý câu hỏi tương tự khi không tìm thấy thông tin (`generate_similar_questions`)
+   - Xử lý các trường hợp đặc biệt
+   - Trích dẫn nguồn tin cậy
 
 ## Cấu trúc dự án
 ```
@@ -174,7 +198,6 @@ BE/
 ├── .env.example                  # Mẫu cho file .env
 ├── requirements.txt              # Danh sách các thư viện cần thiết
 ├── README.md                     # Tài liệu hướng dẫn
-├── performance_metrics.csv       # Dữ liệu đánh giá hiệu suất
 ├── supabase_modules/             # Thư mục chứa các module Supabase
 │   ├── __init__.py               # File khởi tạo
 │   ├── auth.py                   # Module xác thực người dùng
@@ -190,15 +213,16 @@ BE/
 │   ├── profile.html              # Trang hồ sơ người dùng
 │   ├── forgot_password.html      # Trang quên mật khẩu
 │   └── integration_help.html     # Trang hướng dẫn tích hợp
-├── static/                       # Thư mục chứa các file tĩnh
-│   └── js/                       # Thư mục JavaScript
 ├── uploads/                      # Thư mục lưu trữ các file được tải lên
 │   ├── .gitkeep                  # File để giữ thư mục uploads trên git
-│   ├── rag_state.json            # Trạng thái của hệ thống RAG
-│   ├── faiss_index.bin           # Index vector FAISS
-│   ├── vectors.pkl               # Vector embedding được lưu trữ
-│   ├── tfidf_vectorizer.pkl      # Mô hình TF-IDF vectorizer
-│   └── tfidf_matrix.pkl          # Ma trận TF-IDF
+│   ├── 1c30cdd0-06ba-4fc2-8da6-0214.../  # Thư mục của người dùng (UUID)
+│   └── 3fb89304-6576-4388-af60-c6d3.../  # Thư mục của người dùng khác (UUID)
+│       ├── document.*(pdf, docx, txt)      # Các file tài liệu 
+│       ├── faiss_index.bin                 # Index vector FAISS
+│       ├── rag_state.json                  # Trạng thái của hệ thống RAG
+│       ├── tfidf_matrix.pkl               # Ma trận TF-IDF
+│       ├── tfidf_vectorizer.pkl           # Mô hình TF-IDF vectorizer
+│       └── vectors.pkl                    # Vector embedding được lưu trữ
 ```
 
 ## Cài đặt
@@ -327,56 +351,58 @@ docker run -p 5000:5000 --env-file .env rag-chatbot
 - **Đăng xuất**: `/logout` (GET)
 - **Quên mật khẩu**: `/forgot-password` (GET, POST)
 - **Xem hồ sơ**: `/profile` (GET)
-- **Cập nhật hồ sơ**: `/api/user/profile` (POST)
-- **Đổi mật khẩu**: `/api/user/change-password` (POST)
+- **Đổi mật khẩu**: `/change-password` (POST)
+- **Xóa thông báo flash**: `/clear-flash-messages` (POST)
 
 #### 2. Quản lý trò chuyện
-- **Lấy lịch sử chat**: `/api/chat/history` (GET)
-- **Tạo chat mới**: `/api/chat` (POST)
-- **Thêm tin nhắn**: `/api/chat/<chat_id>/message` (POST)
-- **Lấy tin nhắn**: `/api/chat/<chat_id>/messages` (GET)
-- **Xóa chat**: `/api/chat/<chat_id>` (DELETE)
-- **Xóa tất cả chat**: `/api/chats/delete-all` (DELETE)
-- **Đồng bộ chat từ localStorage**: `/api/chat/sync` (POST)
+- **Truy vấn câu hỏi**: `/query` (POST)
+- **API đặt câu hỏi**: `/api/answer` (POST)
 
 #### 3. Quản lý tài liệu
 - **Upload file**: `/upload` (POST)
-- **Xóa file**: `/remove` (POST), `/delete-file` (POST)
+- **Xóa file**: `/remove` (POST)
+- **Xóa file người dùng**: `/delete-file` (POST)
 - **Khởi tạo dữ liệu người dùng**: `/init-user-data` (POST)
 
-#### 4. Trả lời câu hỏi
-- **Trả lời câu hỏi**: `/api/answer` (POST)
-- **Body** (JSON):
+#### 4. Cấu hình và hiệu suất
+- **Lưu cài đặt**: `/settings` (POST)
+- **Xem hiệu suất**: `/api/performance` (GET)
+- **Danh sách phương pháp chunking**: `/api/chunking_methods` (GET)
+- **Kiểm tra kết nối Supabase**: `/api/supabase-check` (GET)
+- **Xem embeddings**: `/api/embeddings` (GET)
+- **Đánh giá hệ thống**: `/api/evaluate` (POST)
+
+#### 5. Format API request
+Ví dụ format cho request đến `/api/answer`:
 ```json
 {
     "question": "Câu hỏi của bạn",
-    "top_k": 10,
+    "top_k": 20,
     "threshold": 5.0,
     "model": "gemini-2.0-flash",
-    "chunking_method": "sentence_windows"
+    "chunking_method": "hybrid"
 }
 ```
 
-#### 5. Hiệu suất và cấu hình
-- **Lấy hiệu suất**: `/api/performance` (GET)
-- **Danh sách phương pháp chunking**: `/api/chunking_methods` (GET)
-- **Lưu cài đặt**: `/settings` (POST)
-- **Xem embeddings**: `/api/embeddings` (GET)
-- **Đánh giá hệ thống**: `/api/evaluate` (POST)
-- **Kiểm tra kết nối Supabase**: `/api/supabase-check` (GET)
-
 ## Phương pháp Chunking
-Hệ thống hỗ trợ nhiều phương pháp chunking khác nhau:
+Dựa trên phân tích mã nguồn, hệ thống có triển khai 9 phương pháp chunking khác nhau:
 
-1. **Sentence Windows**: Chia văn bản thành các cửa sổ câu chồng lấp
-2. **Paragraph**: Chia văn bản theo đoạn văn
-3. **Semantic**: Chia văn bản dựa trên ngữ nghĩa
-4. **Token**: Chia văn bản dựa trên số lượng token
-5. **Adaptive**: Điều chỉnh kích thước chunk dựa trên nội dung
-6. **Hierarchical**: Chia văn bản theo cấu trúc phân cấp
-7. **Contextual**: Chia văn bản dựa trên ngữ cảnh
-8. **Multi-granularity**: Kết hợp nhiều mức độ chi tiết
-9. **Hybrid**: Kết hợp nhiều phương pháp chunking (Mặc định)
+1. **Sentence Windows** (`create_sentence_windows`): Chia văn bản thành các cửa sổ câu chồng lấp, phù hợp với tài liệu văn bản thông thường
+2. **Paragraph** (`create_paragraph_chunks`): Chia văn bản theo đoạn văn vật lý (dựa trên dấu xuống dòng), hiệu quả với tài liệu có cấu trúc đoạn rõ ràng
+3. **Semantic** (`create_semantic_chunks`): Chia văn bản dựa trên ranh giới ngữ nghĩa, ưu tiên giữ các điều khoản liên quan
+4. **Token** (`create_token_chunks`): Chia văn bản dựa trên số lượng token, đảm bảo không vượt quá giới hạn của LLM
+5. **Adaptive** (`create_adaptive_chunks`): Tự động điều chỉnh kích thước chunk dựa trên cấu trúc và nội dung
+6. **Hierarchical** (`create_hierarchical_chunks`): Tạo cấu trúc phân cấp và giữ ngữ cảnh phân cấp
+7. **Contextual** (`create_contextual_chunks`): Tập trung vào việc giữ ngữ cảnh giữa các đoạn liên quan
+8. **Multi-granularity** (`create_multi_granularity_chunks`): Tạo chunks ở nhiều cấp độ chi tiết khác nhau
+9. **Hybrid** (`create_hybrid_chunks`) (Mặc định): Kết hợp nhiều phương pháp trên để tạo bộ chunks tối ưu nhất
+
+Tuy đã triển khai 9 phương pháp, hiện tại giao diện người dùng chỉ hỗ trợ 3 phương pháp chính để người dùng lựa chọn:
+- Sentence Windows
+- Paragraph
+- Hybrid (Mặc định)
+
+Phương pháp nào phù hợp nhất phụ thuộc vào loại tài liệu và nhu cầu truy vấn của người dùng.
 
 ## Tối ưu hóa hiệu suất
 - Điều chỉnh các tham số chunking trong phần cài đặt
@@ -398,5 +424,74 @@ Hệ thống hỗ trợ nhiều phương pháp chunking khác nhau:
 - Thường xuyên thay đổi mật khẩu người dùng và khóa JWT
 - Sao lưu dữ liệu định kỳ
 
-## Đóng góp
-Vui lòng gửi pull request hoặc mở issue để đóng góp vào dự án.
+## Kết quả thực tế của hệ thống
+
+### Hiệu năng xử lý
+1. **Thời gian xử lý file**:
+   - PDF (10-15 trang): ~30-60 giây cho quá trình trích xuất, chunk, embed và index
+   - Yếu tố ảnh hưởng:
+     + Cấu hình máy tính
+     + Phương pháp chunking được chọn (Hybrid thường tốn thời gian hơn)
+     + Độ phức tạp và định dạng của nội dung
+
+2. **Thời gian phản hồi câu hỏi**:
+   - Quy trình bao gồm: query transform → hybrid search → reranking → context building → LLM generation
+   - Câu hỏi đơn giản: ~3-7 giây
+   - Câu hỏi phức tạp hoặc cần trả lời dài: ~8-20 giây
+   - Phần lớn thời gian là do LLM generation (Gemini API)
+
+### Độ chính xác
+1. **Truy xuất thông tin**:
+   - Tỉ lệ truy xuất chunks liên quan cao nhờ tìm kiếm kết hợp (Hybrid Search)
+   - Reranking giúp sắp xếp kết quả theo độ liên quan
+   - Hiệu quả tốt với tài liệu pháp luật và tài liệu có cấu trúc
+
+2. **Chất lượng câu trả lời**:
+   - Câu trả lời bám sát nội dung tài liệu gốc
+   - Giảm thiểu hiện tượng 'ảo giác' (hallucination)
+   - Trích dẫn nguồn và trang tham khảo
+
+### Tính năng hiện có và kế hoạch phát triển
+
+#### Đã hoàn thiện
+1. **Xử lý tài liệu cơ bản**:
+   - Trích xuất văn bản từ PDF, DOCX, TXT
+   - Chunking với 3 phương pháp (Sentence Windows, Paragraph, Hybrid)
+   - Lưu trữ và truy xuất vector sử dụng FAISS
+
+2. **Xác thực và quản lý người dùng**:
+   - Đăng ký/đăng nhập với email hoặc Google OAuth
+   - Quản lý phiên làm việc của người dùng
+   - Bảo mật thông tin cá nhân
+
+3. **Truy vấn và trả lời**:
+   - Tìm kiếm kết hợp (Hybrid Search: FAISS + TF-IDF)
+   - Tích hợp Gemini LLM
+   - Tạo câu trả lời với nguồn tham khảo
+   - Gợi ý câu hỏi khi không tìm thấy câu trả lời
+
+4. **Giao diện người dùng**:
+   - Giao diện đơn giản, trực quan
+   - Hỗ trợ responsive cho các thiết bị
+   - Quản lý lịch sử trò chuyện
+
+#### Đang phát triển
+1. **Nâng cao xử lý tài liệu**:
+   - Thêm các phương pháp chunking chuyên sâu (Semantic, Token, Adaptive...)
+   - Hỗ trợ thêm các định dạng file
+   - Cải thiện độ chính xác trích xuất văn bản
+
+2. **Tối ưu hóa tiếng Việt**:
+   - Cải thiện xử lý đặc thù của tiếng Việt
+   - Tích hợp thư viện xử lý ngôn ngữ tiếng Việt nâng cao
+   - Fine-tuning prompt cho tiếng Việt
+
+3. **Monitoring và Logging**:
+   - Hệ thống đo lường hiệu suất toàn diện
+   - Dashboard theo dõi quá trình xử lý
+   - Phân tích lỗi tự động
+
+4. **Hiệu suất và khả năng mở rộng**:
+   - Tăng tốc xử lý tài liệu lớn
+   - Tối ưu hóa bộ nhớ và lưu trữ
+   - Hỗ trợ xử lý song song cho nhiều requests
