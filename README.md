@@ -7,7 +7,7 @@ Hệ thống RAG (Retrieval-Augmented Generation) Chatbot là một ứng dụng
 
 ![RAG System Architecture](./templates/images/rag-google-vertex-ai.png)
 
-Hệ thống RAG (Retrieval-Augmented Generation) được chia thành hai quy trình chính:
+Hệ thống RAG (Retrieval-Augmented Generation) được thiết kế dựa trên Công cụ Vertex AI RAG của Goolge và được chia thành hai quy trình chính:
 
 1. **Quy trình xử lý tài liệu (Ingest documents)**:
    - Source: Tài liệu nguồn được tải lên
