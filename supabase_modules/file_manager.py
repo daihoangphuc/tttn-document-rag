@@ -128,18 +128,37 @@ def delete_user_file(user_id: str, filename: str) -> bool:
         else:
             # Xóa tệp tin từ hệ thống tệp
             os.remove(file_path)
+            logger.info(f"Đã xóa tệp tin {filename} của người dùng {user_id} khỏi hệ thống tệp")
         
         # Xóa tệp tin khỏi Supabase thay vì chỉ đánh dấu đã xóa
         supabase = get_supabase_client()
-            
-        # DELETE thay vì UPDATE
-        response = supabase.table('files').delete().eq('user_id', user_id).eq('filename', filename).execute()
         
-        # Kiểm tra kết quả
-        if response.data:
-            logger.info(f"Đã xóa tệp tin {filename} của người dùng {user_id} khỏi cơ sở dữ liệu")
-        else:
-            logger.warning(f"Không tìm thấy bản ghi tệp tin {filename} của người dùng {user_id} trong cơ sở dữ liệu")
+        # Thử xóa bằng nhiều cách khác nhau để đảm bảo xóa thành công
+        try:
+            # Cách 1: Xóa bằng DELETE với điều kiện filename và user_id
+            response = supabase.table('files').delete().eq('user_id', user_id).eq('filename', filename).execute()
+            
+            # Kiểm tra kết quả
+            if response.data and len(response.data) > 0:
+                logger.info(f"Đã xóa tệp tin {filename} của người dùng {user_id} khỏi cơ sở dữ liệu (Cách 1)")
+            else:
+                # Cách 2: Xóa bằng cách sử dụng file_path thay vì filename
+                file_path_in_db = os.path.join(user_id, secure_filename(filename))
+                response = supabase.table('files').delete().eq('user_id', user_id).eq('file_path', file_path_in_db).execute()
+                
+                if response.data and len(response.data) > 0:
+                    logger.info(f"Đã xóa tệp tin {filename} của người dùng {user_id} khỏi cơ sở dữ liệu (Cách 2)")
+                else:
+                    # Cách 3: Sử dụng SQL trực tiếp
+                    response = supabase.table('files').delete().filter('user_id', 'eq', user_id).filter('filename', 'eq', filename).execute()
+                    logger.info(f"Đã thử xóa tệp tin bằng truy vấn trực tiếp: {response.data}")
+                    
+                    # Thông báo
+                    if not response.data or len(response.data) == 0:
+                        logger.warning(f"Không tìm thấy bản ghi tệp tin {filename} của người dùng {user_id} trong cơ sở dữ liệu sau khi thử 3 cách")
+        except Exception as e:
+            logger.error(f"Lỗi khi xóa tệp tin từ Supabase: {str(e)}")
+            # Không return False ở đây, vẫn tiếp tục để xóa tệp ra khỏi hệ thống RAG
         
         return True
     except Exception as e:

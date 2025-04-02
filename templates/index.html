@@ -2890,6 +2890,15 @@
                             const fileElement = document.querySelector(`div[data-filename="${filename}"]`);
                             if (fileElement) {
                                 fileElement.remove();
+                            } else {
+                                // Nếu không tìm thấy phần tử bằng data-filename, thử tìm bằng các cách khác
+                                const allFileElements = document.querySelectorAll('#documents-content .space-y-1 > div');
+                                for (let elem of allFileElements) {
+                                    if (elem.textContent.includes(filename)) {
+                                        elem.remove();
+                                        break;
+                                    }
+                                }
                             }
                             
                             // Hiển thị thông báo thành công
@@ -2897,13 +2906,31 @@
                             
                             // Kiểm tra nếu không còn tài liệu nào, hiển thị thông báo
                             const remainingFiles = document.querySelectorAll('#documents-content .space-y-1 > div');
-                            if (remainingFiles.length === 0) {
+                            if (remainingFiles.length === 0 || (data.remainingFiles && data.remainingFiles.length === 0)) {
                                 const filesList = document.querySelector('#documents-content .space-y-1');
                                 if (filesList) {
+                                    // Xóa tất cả nội dung hiện tại
+                                    filesList.innerHTML = '';
+                                    
+                                    // Thêm thông báo không có tài liệu
                                     const noFilesMessage = document.createElement('p');
                                     noFilesMessage.className = 'text-xs sm:text-sm text-gray-500 dark:text-gray-400';
                                     noFilesMessage.textContent = 'Chưa có tài liệu nào.';
                                     filesList.appendChild(noFilesMessage);
+                                }
+                            }
+                            
+                            // Cập nhật localStorage nếu có
+                            if (data.clearLocalStorage) {
+                                try {
+                                    // Xóa tham chiếu đến file trong localStorage
+                                    const storedAnswers = JSON.parse(localStorage.getItem('chatAnswers') || '{}');
+                                    if (storedAnswers[filename]) {
+                                        delete storedAnswers[filename];
+                                        localStorage.setItem('chatAnswers', JSON.stringify(storedAnswers));
+                                    }
+                                } catch (e) {
+                                    console.error('Lỗi khi cập nhật localStorage:', e);
                                 }
                             }
                         } else {

@@ -1691,41 +1691,151 @@ def add_document(text, filename, chunking_method="sentence_windows", config=None
 # --- Xóa tài liệu ---
 def remove_document(filename):
     """Xóa tài liệu từ hệ thống RAG"""
-    global global_vector_list, global_metadata, global_all_files, faiss_index
+    global global_vector_list, global_metadata, global_all_files, faiss_index, tfidf_vectorizer, tfidf_matrix
     
     if filename not in global_all_files:
         return False, f"Không tìm thấy tài liệu '{filename}'"
     
     try:
-        # Tìm các chunks thuộc tài liệu
+        logger.info(f"Bắt đầu xóa tài liệu '{filename}'")
+        
+        # Kiểm tra tính đồng bộ của dữ liệu trước khi xử lý
+        if len(global_vector_list) != len(global_metadata):
+            logger.warning(f"Phát hiện không đồng bộ: global_vector_list ({len(global_vector_list)}) vs global_metadata ({len(global_metadata)})")
+        
+        # Kiểm tra cấu trúc của global_vector_list
+        is_nested_array = False
+        if len(global_vector_list) == 1 and isinstance(global_vector_list[0], np.ndarray):
+            # Trường hợp load_state đã nạp một mảng numpy duy nhất
+            is_nested_array = True
+            # Chuyển đổi thành danh sách các vector riêng lẻ nếu global_vector_list là một mảng numpy duy nhất
+            if len(global_vector_list[0].shape) > 1:
+                # Đây là mảng 2D, chuyển về danh sách các vector 1D
+                vectors_array = global_vector_list[0]
+                global_vector_list = [vectors_array[i] for i in range(vectors_array.shape[0])]
+                logger.info(f"Đã chuyển đổi global_vector_list từ mảng numpy sang danh sách {len(global_vector_list)} vector")
+        
+        # Các chỉ số của vectors cần giữ lại và chỉ số của vectors liên quan đến file cần xóa
+        indices_to_keep = []
+        indices_to_remove = []
+        
+        # Tìm các chunks thuộc tài liệu để xóa và các chunks khác để giữ lại
         new_vectors = []
         new_metadata = []
-        indices_to_keep = []
         
-        for i, meta in enumerate(global_metadata):
-            if meta["filename"] != filename:
-                new_metadata.append(meta)
-                new_vectors.append(global_vector_list[i])
-                indices_to_keep.append(i)
+        # Lặp qua danh sách metadata và vector một cách an toàn
+        max_index = min(len(global_vector_list), len(global_metadata))
+        for i in range(max_index):
+            try:
+                if global_metadata[i]["filename"] != filename:
+                    # Giữ lại các metadata và vector không thuộc file cần xóa
+                    new_metadata.append(global_metadata[i])
+                    new_vectors.append(global_vector_list[i])
+                    indices_to_keep.append(i)
+                else:
+                    # Đánh dấu các indices cần xóa
+                    indices_to_remove.append(i)
+            except (IndexError, KeyError) as e:
+                logger.error(f"Lỗi khi xử lý phần tử thứ {i}: {str(e)}")
+                continue
+        
+        # Ghi log số lượng chunks đã xóa và giữ lại
+        logger.info(f"Đã xác định {len(indices_to_remove)} chunks để xóa và {len(indices_to_keep)} chunks để giữ lại")
         
         # Cập nhật danh sách vector và metadata
         global_vector_list = new_vectors
         global_metadata = new_metadata
         
         # Xóa khỏi danh sách tài liệu
-        del global_all_files[filename]
+        if filename in global_all_files:
+            del global_all_files[filename]
         
-        # Tạo lại index FAISS
-        if global_vector_list:
-            rebuild_indices()
+        # Tạo lại FAISS index 
+        if global_vector_list and len(global_vector_list) > 0:
+            try:
+                # Xác định phương pháp chuyển đổi phù hợp dựa trên loại dữ liệu
+                if isinstance(global_vector_list[0], list):
+                    # Nếu là list của list
+                    vectors = np.array(global_vector_list, dtype=np.float32)
+                elif isinstance(global_vector_list[0], np.ndarray):
+                    # Nếu đã là mảng numpy
+                    if len(global_vector_list) == 1:
+                        vectors = global_vector_list[0].astype(np.float32)
+                    else:
+                        vectors = np.stack(global_vector_list).astype(np.float32)
+                else:
+                    # Trường hợp khác, thử chuyển đổi bình thường
+                    vectors = np.array(global_vector_list, dtype=np.float32)
+                
+                # Đảm bảo vectors có đúng kích thước
+                if len(vectors.shape) == 1:
+                    # Nếu chỉ còn 1 vector
+                    vector_dim = len(vectors)
+                    vectors = vectors.reshape(1, vector_dim)
+                    logger.info(f"Reshape vectors thành {vectors.shape}")
+                
+                # Đảm bảo vectors có 2 chiều
+                if len(vectors.shape) != 2:
+                    raise ValueError(f"Vectors phải có 2 chiều, hiện tại là {vectors.shape}")
+                
+                dimension = vectors.shape[1]
+                
+                # Tạo index mới
+                new_index = faiss.IndexFlatL2(dimension)
+                new_index.add(vectors)
+                faiss_index = new_index
+                
+                logger.info(f"Đã tạo lại FAISS index với {faiss_index.ntotal} vectors sau khi xóa file")
+                
+                # Cập nhật TF-IDF chỉ nếu cần thiết
+                if len(new_metadata) > 0:
+                    # Lấy tất cả các chunks còn lại
+                    all_texts = []
+                    for meta in new_metadata:
+                        if "text" in meta and meta["text"]:
+                            all_texts.append(meta["text"])
+                    
+                    if all_texts:
+                        # Tạo lại TF-IDF từ các văn bản còn lại
+                        global tfidf_vectorizer, tfidf_matrix
+                        if tfidf_vectorizer is not None:
+                            try:
+                                tfidf_matrix = tfidf_vectorizer.fit_transform(all_texts)
+                                logger.info(f"Đã cập nhật TF-IDF matrix với {len(all_texts)} chunks còn lại")
+                            except Exception as e:
+                                logger.warning(f"Không thể cập nhật TF-IDF matrix với vectorizer hiện tại: {str(e)}")
+                                # Tạo mới TF-IDF vectorizer
+                                tfidf_vectorizer = TfidfVectorizer(
+                                    min_df=1, max_df=0.85, stop_words=None,
+                                    use_idf=True, norm='l2', ngram_range=(1, 2)
+                                )
+                                tfidf_matrix = tfidf_vectorizer.fit_transform(all_texts)
+                                logger.info(f"Đã tạo TF-IDF index mới với {len(all_texts)} chunks")
+                
+            except Exception as e:
+                logger.error(f"Lỗi khi tạo lại FAISS index: {str(e)}")
+                faiss_index = None
+                # Thử khởi tạo lại index với kích thước mặc định
+                try:
+                    initialize_faiss_index()
+                    logger.info("Đã khởi tạo lại FAISS index với kích thước mặc định")
+                except:
+                    logger.error("Không thể khởi tạo lại FAISS index")
+                return False, f"Lỗi khi tạo lại index sau khi xóa: {str(e)}"
         else:
+            # Nếu không còn vectors nào, đặt các indices về None
             faiss_index = None
+            tfidf_matrix = None
+            logger.warning("Không còn vector nào sau khi xóa file, đã đặt indices về None")
         
         # Lưu trạng thái
         save_state()
         
-        logger.info(f"Đã xóa tài liệu '{filename}' khỏi hệ thống")
+        logger.info(f"Đã xóa tài liệu '{filename}' khỏi hệ thống thành công")
         return True, f"Đã xóa tài liệu '{filename}' khỏi hệ thống thành công"
+    except IndexError as e:
+        logger.error(f"Lỗi chỉ mục khi xóa tài liệu '{filename}': {str(e)}")
+        return False, f"Lỗi chỉ mục khi xóa tài liệu: {str(e)}"
     except Exception as e:
         logger.error(f"Lỗi khi xóa tài liệu '{filename}': {str(e)}")
         return False, f"Lỗi khi xóa tài liệu: {str(e)}"

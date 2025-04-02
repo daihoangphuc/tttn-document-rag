@@ -903,12 +903,7 @@ def enhanced_remove_file(index_html, global_all_files, load_settings, remove_doc
         )
     
     try:
-        # Xóa file trong Supabase
-        supabase_delete_success = delete_user_file(user['id'], filename)
-        if not supabase_delete_success:
-            logger.warning(f"Không thể xóa tệp '{filename}' từ Supabase cho user_id: {user['id']}")
-        
-        # Xóa tài liệu khỏi hệ thống RAG
+        # 1. Xóa tài liệu khỏi hệ thống RAG trước (để xóa các chunks metadata và vector)
         success, message = remove_document(filename)
         
         if not success:
@@ -926,13 +921,26 @@ def enhanced_remove_file(index_html, global_all_files, load_settings, remove_doc
                 sources=None
             )
         
-        # Trả về response thành công với script để xóa localStorage
+        # 2. Xóa file trong Supabase sau khi xóa thành công khỏi hệ thống RAG
+        supabase_delete_success = delete_user_file(user['id'], filename)
+        if not supabase_delete_success:
+            logger.warning(f"Không thể xóa tệp '{filename}' từ Supabase cho user_id: {user['id']}")
+            # Vẫn trả về thành công nếu đã xóa khỏi hệ thống RAG nhưng thêm thông báo
+            message += " (Lưu ý: Có thể còn dữ liệu trong CSDL, vui lòng liên hệ admin)"
+            
+        # Đảm bảo file đã được xóa khỏi global_all_files (đề phòng)
+        if filename in global_all_files:
+            del global_all_files[filename]
+            logger.info(f"Đã xóa tài liệu '{filename}' khỏi global_all_files")
+        
+        # Trả về response thành công với script để xóa localStorage và thông tin cập nhật
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({
                 'success': True,
                 'message': message,
                 'filename': filename,
-                'clearLocalStorage': True
+                'clearLocalStorage': True,
+                'remainingFiles': list(global_all_files.keys()) if global_all_files else []
             })
         
         return render_template_string(
